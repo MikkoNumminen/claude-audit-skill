@@ -1,0 +1,15 @@
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+
+# Local test output if someone runs the skill inside this repo
+docs/audits/
+
+# Claude Code local state that shouldn't leak into the skill repo
+.claude/settings.local.json
+.claude/worktrees/

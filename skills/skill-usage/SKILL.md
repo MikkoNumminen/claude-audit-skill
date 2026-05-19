@@ -25,7 +25,7 @@ NOT for: real-time monitoring (the JSONL is flushed at session end, sometimes la
 3. Deduplicate by `requestId` (the harness emits two adjacent assistant lines per API call when a message contains both thinking and tool_use blocks — they share `requestId` and `usage`).
 4. Group records by `skill`, then by `promptId` to count invocations.
 5. Compute per-skill: invocation count in window, average `tokens_per_use` (including cache-creation input + output, excluding cache-read which is a hit, not a cost), total tokens in window, and an extrapolated `uses_per_year` from the in-window rate.
-6. Emit `.claude/agent-verdicts/SKILL-USAGE-{YYYY-MM-DD}.json` and print the path.
+6. Emit two files in `.claude/agent-verdicts/`: the dated `SKILL-USAGE-{YYYY-MM-DD}.json` (history) and a byte-identical `SKILL-USAGE-LATEST.json` (stable filename for consumers like `/skill-registry`'s transcript-measurement overlay).
 
 End-to-end with no user pauses. The companion script does the parsing; the main thread validates the output and reports the summary.
 

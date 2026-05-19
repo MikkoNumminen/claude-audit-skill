@@ -244,13 +244,22 @@ function main() {
     skills,
   };
 
-  fs.mkdirSync(path.dirname(path.resolve(args.outPath)), { recursive: true });
-  fs.writeFileSync(args.outPath, JSON.stringify(output, null, 2));
+  const outAbs = path.resolve(args.outPath);
+  fs.mkdirSync(path.dirname(outAbs), { recursive: true });
+  const json = JSON.stringify(output, null, 2);
+  fs.writeFileSync(outAbs, json);
+  // Also write a SKILL-USAGE-LATEST.json sibling pointing at the same data.
+  // Consumers like `/skill-registry`'s transcript-measurement overlay link to
+  // a stable filename instead of having to lexicographic-sort dated files.
+  // Byte-identical content; rewritten on every run so it always reflects the
+  // freshest snapshot.
+  const latestPath = path.join(path.dirname(outAbs), 'SKILL-USAGE-LATEST.json');
+  fs.writeFileSync(latestPath, json);
 
   const totalInvs = skills.reduce((a, s) => a + s.invocations, 0);
   const totalTokens = skills.reduce((a, s) => a + s.total_tokens_in_window, 0);
   console.log(
-    `Wrote ${args.outPath} — ${skills.length} skills (${totalInvs} invocations, ~${Math.round(totalTokens / 1000)}K total tokens) across ${files.length} sessions in ${args.windowDays} days.`,
+    `Wrote ${outAbs} (+ ${latestPath}) — ${skills.length} skills (${totalInvs} invocations, ~${Math.round(totalTokens / 1000)}K total tokens) across ${files.length} sessions in ${args.windowDays} days.`,
   );
   if (counts.malformed > 0) console.log(`(skipped ${counts.malformed} malformed lines)`);
   if (counts.unreadable > 0) console.log(`(skipped ${counts.unreadable} unreadable files)`);

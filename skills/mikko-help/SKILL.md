@@ -191,7 +191,30 @@ If the frontmatter is malformed or the file has none, fall back to the parent di
 
 Sort by name. Find the longest skill name (cap at 24 chars; longer names get truncated with `…`). Pad to that width + 4 spaces, then print the truncated description. Use `printHTML` style if rendering through a terminal that supports color; plain print otherwise.
 
-### 4. Done
+### 4. Check for new skills (cheap, non-blocking)
+
+After the listing prints, attempt to locate the `claude-skills` source repo to see if there are skills in source that aren't installed yet. Probe order:
+
+1. **Current working directory** — does it have `install-mikko.sh` AND a `skills/` directory? If yes, that's the source.
+2. **Parent directory of cwd** — walk up two levels checking for the same markers.
+
+If neither hits, **skip silently**. Don't badger the user about a possibly-missing repo, and don't probe hardcoded author-specific paths. This check is best-effort discovery, not a gate.
+
+If the source IS found:
+- `Glob` `<source>/skills/*/SKILL.md` and read the `name:` from each → set of source skills.
+- `Glob` `~/.claude/skills/*/SKILL.md` (note: NO `mikko-*` prefix filter — the user's namespace may be mixed; some skills install unprefixed via `install.sh`).
+- For each source skill, count it as "installed" if ANY of these match a real install-dir entry: the source name itself (`foo`), the mikko-prefixed form (`mikko-foo`), or the source name when already prefixed (`mikko-foo` source → look for `mikko-foo` install).
+- Set difference: source skills NOT represented in any installed form.
+- If non-empty, print a footer using a plain text marker — no emoji:
+
+  ```
+  NEW: N skill(s) available since your last install:
+       mikko-readme-drift-sync
+       mikko-foo
+     Run /mikko-install to add them.
+  ```
+
+### 5. Done
 
 Print the tip line about `/mikko<Tab>` and `/mikko-skill-registry`, then exit. The whole skill should complete in under 5 seconds end-to-end.
 
@@ -224,6 +247,7 @@ Cadence: ad-hoc, usually a few times per week when actively iterating. ~50 uses/
 - **`--barney` on a skill without the field.** Falls back to the truncated `description` with an `(no barney)` annotation. The annotation is the design: it makes the gap visible without breaking the listing, nudging the human (or the next SKILL.md author) to add the field at next edit. Don't infer or invent a barney line — that defeats the point of having an explicit field.
 - **`--detect` in a directory with no config files.** A plain `/tmp/scratch/` with one `.py` file and nothing else returns the "Unknown / mixed / no clear signal" row from the matrix. The recommendation is `audit` only. This is correct behavior, not a bug — the detector is honest about what it can and can't infer.
 - **`--detect` in a polyglot monorepo.** A repo with both a Python backend AND a React frontend gets recommendations for both stacks. The output prints two grouped sections rather than collapsing into a single "polyglot" verdict — concrete is more useful than abstract here.
+- **New-skills footer only fires when invoked from inside the `claude-skills` source repo** (or a subdirectory). From a consumer repo (e.g. one of your other projects), the source-probe misses and the footer skips silently — by design, since the skill doesn't track external paths. **The moment you most want the reminder is exactly when you're not in the source repo**, so the practical workflow is: run `/mikko-help` from your `claude-skills` checkout periodically (e.g. after a `git pull`) to see what's new. From everywhere else, the listing still works — just no new-skills footer.
 
 ## Limitations
 

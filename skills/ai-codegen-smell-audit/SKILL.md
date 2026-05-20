@@ -1,6 +1,7 @@
 ---
 name: ai-codegen-smell-audit
 description: Read-only audit for specific failure modes that recur in LLM-generated code — defensive guards on impossible cases, generic names in domain code, swallowed errors, single-use helpers, mirror tests, and so on. Each check has a concrete smell example and a concrete legitimate counter-example so the auditor (human + assistant) can tell signal from noise. Produces `docs/audits/ai-smell-<YYYY-MM-DD>.md` with severity-ranked findings. Use whenever the user says "smell audit", "check for AI-codegen smells", "review this branch for LLM-style sludge", "audit the code for generated-code patterns", or asks for a calibration pass before merging a large generated diff. NOT a witch hunt for "AI-written code" — every finding must be a specific testable pattern with a concrete example, not a vibe.
+barney: Scans for ten patterns that show up most often in AI-generated code (defensive guards, swallowed errors, generic names). Every finding has a concrete example so you can tell signal from noise. Run after a big AI-pair-programming session.
 ---
 
 # ai-codegen-smell-audit

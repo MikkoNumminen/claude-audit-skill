@@ -1,6 +1,7 @@
 ---
 name: react-anti-patterns-audit
 description: Read-only audit for six concrete React anti-patterns that recur in component code (key=index in lists, useEffect for derived state, dep-array lies, state mutation instead of replace, missing effect cleanup, multiple sources of truth). Each check has a concrete smell example and a concrete legitimate counter-example so the auditor can tell signal from noise. **Runs a pre-flight check first** — if the target codebase isn't a React project, the skill aborts cleanly with a suggestion to use a different skill. Use whenever the user says "audit my React code", "review this for React anti-patterns", "check my hooks", "find re-render issues", or before merging a substantial component PR. NOT a witch hunt for "non-idiomatic React" — every finding must be a specific testable pattern with a concrete example.
+barney: Checks your React code for six common gotchas (index-as-key, useEffect-for-derived-state, dep-array lies, leaky effect cleanup). Bails fast if it's not a React codebase.
 ---
 
 # react-anti-patterns-audit

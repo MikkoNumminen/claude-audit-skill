@@ -17,6 +17,16 @@ This repo started life as `claude-audit-skill` housing a single audit skill. It 
 
 Each skill has its own SKILL.md with the full recipe — when to invoke, what it reads, what it writes, what it explicitly refuses to do. Read the SKILL.md to learn what a skill does; read [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) for the `audit` skill's design rationale specifically.
 
+## Frontmatter convention: `name`, `description`, `barney`
+
+Each SKILL.md's YAML frontmatter carries three fields:
+
+- **`name`** — the slash-command identifier (e.g. `audit`, `react-anti-patterns-audit`). This is what Claude Code's harness matches against; `install-mikko.sh` rewrites it to the prefixed name in the consumer-side copy (`mikko-audit`, etc.).
+- **`description`** — the contract: when to invoke, what gets read/written, trigger phrases, scope boundaries. Optimised for Claude Code's skill-matching layer, which compares natural-language requests against this field. Long, precise, full of "when X / not when Y" disambiguation. Reads like a contract.
+- **`barney`** — *(optional)* a plain-English one-or-two-line description of what the skill does in everyday terms. Reads like a tour. Used by `/mikko-help --barney` for friendly listings. Skills without `barney` fall back to the truncated `description` in barney mode; the gap is surfaced with a `(no barney)` annotation, nudging authors to add the field.
+
+Both `description` and `barney` are author-written and editorial — the `description` is optimised for accurate slash-command matching, the `barney` is optimised for human scannability. Keep them aligned but not identical: when the precise contract reads stiffly, the barney line is where you say it like a person would.
+
 ## What a "skill" is
 
 If you've used [Claude Code](https://www.anthropic.com/claude-code) you already know. If not: Claude Code is a command-line assistant that can read and edit your code. A *skill* is a markdown file under `.claude/skills/<name>/SKILL.md` that teaches Claude Code how to do one specific job — like a recipe card. When you describe the job, Claude recognises the recipe and follows it.

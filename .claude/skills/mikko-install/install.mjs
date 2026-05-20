@@ -181,6 +181,15 @@ function copyDir(src, dst) {
   }
 }
 
+function installAndMaybeMark(srcDir, dstDir, method, sourceRoot) {
+  // Install, then write the .mikko-install-source marker — but only for copy
+  // installs. Symlinked entries point back at the source repo, so writing the
+  // marker would land it inside the source itself.
+  const used = tryInstall(srcDir, dstDir, method);
+  if (used === 'copy') writeMarker(dstDir, sourceRoot);
+  return used;
+}
+
 function tryInstall(srcDir, dstDir, method) {
   // Returns the method actually used ('copy' or 'symlink').
   // Atomic-ish: stage the new install in a sibling tempdir, then swap.
@@ -398,8 +407,7 @@ async function runInstall(args, sourceDir, targetDir, sourceSkills) {
         if (args.dryRun) {
           console.log(`  ${pad(name, maxLen + 2)} would update (drift, --force)`);
         } else {
-          const used = tryInstall(srcSkill, dstSkill, method);
-          if (used === 'copy') writeMarker(dstSkill, sourceDir);
+          const used = installAndMaybeMark(srcSkill, dstSkill, method, sourceDir);
           console.log(`  ${pad(name, maxLen + 2)} updated (${used}, was drifted)`);
         }
         updated++;
@@ -419,8 +427,7 @@ async function runInstall(args, sourceDir, targetDir, sourceSkills) {
         if (args.dryRun) {
           console.log(`  ${pad(name, maxLen + 2)} would adopt + replace (no marker)`);
         } else {
-          const used = tryInstall(srcSkill, dstSkill, method);
-          if (used === 'copy') writeMarker(dstSkill, sourceDir);
+          const used = installAndMaybeMark(srcSkill, dstSkill, method, sourceDir);
           console.log(`  ${pad(name, maxLen + 2)} adopted (${used}, replaced unmanaged install)`);
         }
         updated++;
@@ -440,9 +447,7 @@ async function runInstall(args, sourceDir, targetDir, sourceSkills) {
       installed++;
       continue;
     }
-    const used = tryInstall(srcSkill, dstSkill, method);
-    // Marker isn't applicable inside a symlinked dir (would write into source).
-    if (used === 'copy') writeMarker(dstSkill, sourceDir);
+    const used = installAndMaybeMark(srcSkill, dstSkill, method, sourceDir);
     console.log(`  ${pad(name, maxLen + 2)} installed (${used})`);
     installed++;
   }

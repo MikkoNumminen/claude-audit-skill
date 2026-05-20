@@ -5,6 +5,15 @@
 //
 // Run with: node install.test.mjs
 // Exits 0 on success, 1 on any failure.
+//
+// Coverage gaps (intentional):
+//   - Interactive (TTY) paths for --force uninstall and --adopt: subprocess
+//     tests have no TTY, so the script always takes the auto-mode branch. The
+//     interactive [y/N] prompt logic isn't unit-tested. Manual smoke when
+//     touching that code.
+//   - --method symlink: tests force --method copy throughout so they pass on
+//     Windows without Developer Mode. The symlink-fallback note path is
+//     exercised when symlink fails, but the happy symlink path isn't.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -334,6 +343,31 @@ test('--adopt without --force in auto-mode → exit 4', () => {
     // Unmanaged content should be preserved.
     const txt = fs.readFileSync(path.join(unmanaged, 'SKILL.md'), 'utf8');
     assert(/# old/.test(txt), 'unmanaged install was modified despite refusal');
+  } finally { fx.cleanup(); }
+});
+
+test('--adopt --force --dry-run shows "would adopt", writes nothing', () => {
+  const fx = makeFixture();
+  try {
+    const home = path.join(fx.root, 'fakehome');
+    fs.mkdirSync(home);
+    const env = process.platform === 'win32'
+      ? { USERPROFILE: home, HOMEDRIVE: '', HOMEPATH: '' }
+      : { HOME: home };
+    const unmanaged = path.join(home, '.claude', 'skills', 'mikko-foo');
+    fs.mkdirSync(unmanaged, { recursive: true });
+    fs.writeFileSync(path.join(unmanaged, 'SKILL.md'), '---\nname: mikko-foo\n---\n# old\n');
+    const r = run(
+      ['--source', fx.source, '--target', 'user', '--method', 'copy', '--adopt', '--force', '--dry-run'],
+      { env },
+    );
+    assert(r.code === 0, `expected exit 0, got ${r.code}`);
+    assert(/would adopt/.test(r.stdout), `expected "would adopt", got: ${r.stdout}`);
+    // Original content preserved (dry-run wrote nothing).
+    const txt = fs.readFileSync(path.join(unmanaged, 'SKILL.md'), 'utf8');
+    assert(/# old/.test(txt), 'dry-run modified the file');
+    assert(!fs.existsSync(path.join(unmanaged, '.mikko-install-source')),
+      'dry-run wrote a marker file');
   } finally { fx.cleanup(); }
 });
 

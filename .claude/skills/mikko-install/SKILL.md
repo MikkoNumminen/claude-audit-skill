@@ -68,8 +68,8 @@ The asymmetry is deliberate: a marker-bearing drift is provably from a previous 
 
 If you're upgrading from a previous catalog-reader `mikko-help` (which had no marker), the script will refuse to overwrite it on first run. Either:
 
-- Run the included bootstrap helper: `bash bootstrap.sh` (POSIX) or `pwsh bootstrap.ps1` (Windows). It runs the installer with `--adopt --force` after listing what would change.
-- Or run manually: `node install.mjs --source <repo> --target user --method copy --adopt --force`.
+- Run the included bootstrap helper: `bash bootstrap.sh` (POSIX) or `powershell -File bootstrap.ps1` (Windows). The helper does a `--dry-run` first, shows you what would change, and prompts before applying. Pass `--yes` (bash) or `-Yes` (PowerShell) to skip the prompt for scripted use.
+- Or run the installer directly: `node install.mjs --source <repo> --target user --method copy --adopt --force`.
 
 After the first install, all subsequent updates work without `--adopt` — the marker is in place.
 

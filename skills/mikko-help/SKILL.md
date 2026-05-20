@@ -1,6 +1,6 @@
 ---
 name: mikko-help
-description: List every installed `mikko-*` skill with its one-line description. The fast answer to "I know I have a skill for this but can't remember which one." Reads `~/.claude/skills/mikko-*/SKILL.md` frontmatter (plus any project-local `.claude/skills/mikko-*/SKILL.md`), extracts name + description, prints a single formatted table. Pass `--detect` to also scan the current working directory and recommend which `mikko-*` audit skills are likely to find signal — answers "I'm in a new codebase, which of my skills are relevant here?" Pass `--barney` to print plain-English short descriptions (from each skill's optional `barney:` frontmatter field) instead of the full `description` — answers "give me the friendly version, I don't need the full pitch right now." No sub-agents, no network, no measurements — just a table.
+description: List every installed `mikko-*` skill with its description. The fast answer to "I know I have a skill for this but can't remember which one" / "what mikko skills do I have" / "list my skills" / "remind me what's installed." Pass `--detect` for codebase-aware audit recommendations ("which audit should I run on this repo" / "what's relevant for this codebase"). Pass `--barney` for plain-English short descriptions ("give me the friendly version" / "plain-English list"). `--detect` and `--barney` combine independently. No sub-agents, no network, no measurements — just a table. Full mode docs live in the body's "Flags" section.
 barney: Lists your mikko-* skills with their descriptions. Add --detect to also recommend which audits to run on THIS repo. Add --barney to swap descriptions for plain-English one-liners.
 ---
 
@@ -49,7 +49,7 @@ NOT for: cross-repo registry of skills (use `/mikko-skill-registry` for that —
 
 7. Run the codebase-shape detection (see "`--detect` mode" section below).
 8. Map detected signals to a recommendation list using the decision matrix.
-9. Print the recommendation list AFTER the regular skill table, with one-line rationale per audit (why it's relevant here, or why it's being skipped). When `--barney` is ALSO passed, the recommendation rationales use each suggested skill's `barney:` field for the "why it's relevant here" hint.
+9. Print the recommendation list AFTER the regular skill table, with one-line rationale per audit (why it's relevant here, or why it's being skipped). When `--barney` is ALSO passed, the regular skill table at the top uses barney-style copy (same as bare `--barney`). **The recommendation rationales below stay codebase-specific** — they depend on `--detect` signals (e.g. "targets the React-specific layer, 12 .tsx files"), not on the skill's static description. `--barney` is presentation for the listing, not content for the recommendation reasoning.
 
 End-to-end in one main-thread turn. No tools beyond `Glob` and `Read`. Output goes to the chat — nothing is written to disk.
 

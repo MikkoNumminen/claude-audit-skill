@@ -328,6 +328,23 @@ Honesty matters more than hype. This skill is not:
   so if you want to write your own skill for a different recurring
   job, this is a fair template.
 
+## Running the tests
+
+There are two small smoke-test suites if you're poking at the
+installers and want to know nothing has rotted.
+
+```bash
+# install.sh dry-run paths — bash, no framework
+bash install.test.sh
+
+# mikko-install behavior — Node, no framework
+node .claude/skills/mikko-install/install.test.mjs
+```
+
+Both run in isolated tmpdirs and exit non-zero on any failure.
+GitHub Actions runs them on every push and PR — see
+[`.github/workflows/test.yml`](.github/workflows/test.yml).
+
 ## License
 
 MIT. See [LICENSE](LICENSE). Do what you want with it; if it saves

@@ -93,7 +93,6 @@ run_install() {
     local stdout_file="${CURRENT_TMP}/_stdout"
     local stderr_file="${CURRENT_TMP}/_stderr"
     local code=0
-    # shellcheck disable=SC2068  # we want word-split on the explicit array
     bash "${SCRIPT}" "$@" >"${stdout_file}" 2>"${stderr_file}" || code=$?
     LAST_STDOUT="$(cat "${stdout_file}")"
     LAST_STDERR="$(cat "${stderr_file}")"
@@ -144,6 +143,12 @@ t_bad_arg() {
     assert '[[ "${LAST_STDERR}" == *"unknown argument"* ]]' "expected 'unknown argument' in stderr, got: ${LAST_STDERR}" || return 1
 }
 
+t_help_exits_zero() {
+    run_install -h
+    assert '[[ "${LAST_CODE}" -eq 0 ]]' "expected exit 0, got ${LAST_CODE} (stderr: ${LAST_STDERR})" || return 1
+    assert '[[ "${LAST_STDOUT}" == *"target"* ]]' "expected help text to mention 'target', got: ${LAST_STDOUT}" || return 1
+}
+
 t_project_missing_repo_arg() {
     # --target project without --repo should exit 2.
     run_install --target project --dry-run
@@ -186,6 +191,7 @@ echo "install.sh --dry-run smoke tests"
 echo ""
 
 test "bad arg → exit 2"                                       t_bad_arg
+test "-h prints help and exits 0"                             t_help_exits_zero
 test "--target project without --repo → exit 2"               t_project_missing_repo_arg
 test "--dry-run --target user, fresh → would install + exit 0"     t_user_dry_run_fresh
 test "--dry-run --target project, fresh → would install + exit 0"  t_project_dry_run_fresh

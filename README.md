@@ -11,6 +11,67 @@ written report listing every bug it found, with file names and line
 numbers. One run. About ten minutes. The rest of the day is just
 fixing the list.
 
+## Quickstart
+
+One command, after you clone. The setup script asks where to put the
+skills — pick **user-wide** to have them in every project, or
+**project-only** to keep them in the current directory.
+
+### macOS and Linux
+
+The exact same command on both. macOS uses bash by default; on Linux
+you might be in zsh or fish — the script is plain bash and runs the
+same either way.
+
+```bash
+git clone https://github.com/MikkoNumminen/claude-skills.git
+cd claude-skills
+bash setup.sh
+```
+
+If you'd rather skip the prompt: `bash setup.sh --target user` (or
+`--target project`). Add `--yes` to skip every prompt — handy in CI.
+Add `--dry-run` to see what would happen without writing anything.
+
+### Windows
+
+PowerShell — the same shape, different idioms. Works on both stock
+Windows PowerShell (5.1) and PowerShell Core (7+). If you only have
+Git Bash, the macOS / Linux command above works there too.
+
+```powershell
+git clone https://github.com/MikkoNumminen/claude-skills.git
+cd claude-skills
+.\setup.ps1
+```
+
+Skip the prompt with `.\setup.ps1 -Target user` (or `-Target project`).
+Add `-Yes` to skip every prompt, `-DryRun` to preview.
+
+### After setup
+
+Restart Claude Code once. Then in any project, type `/mikko-help` and
+the wizard tells you what to do next. `/mikko-skills` lists every
+skill installed, with a one-line plain-English description per skill.
+
+### What gets installed
+
+Two layouts go into your skills directory:
+
+- The audit skill at `audit/` (legacy single-skill layout from this
+  repo's earlier life).
+- The `mikko-*` namespace at `mikko-help/`, `mikko-install/`, `mikko-skills/`,
+  plus any other `mikko-*` skills under `.claude/skills/` in this repo.
+
+You can install one half at a time if you'd rather — see
+[Manual install](#manual-install) below.
+
+### Prereqs
+
+- **Node.js 18+** (the `mikko-*` installer is a Node script).
+- **bash** (already there on macOS, Linux, and Git Bash on Windows).
+- **PowerShell 5.1+** (stock Windows) or **PowerShell 7+** on Windows.
+
 ## What a "skill" even is
 
 If you've used [Claude Code](https://www.anthropic.com/claude-code)
@@ -118,7 +179,11 @@ Each one turns in a numbered list of problems with exact line
 references. Nothing is fabricated — if they can't point at a real
 line of code, they don't include it.
 
-## Install
+## Manual install
+
+`setup.sh` and `setup.ps1` above do everything in one shot. If you'd
+rather install one half at a time — only the audit skill, or only the
+`mikko-*` namespace — here's how each piece works on its own.
 
 ### Per-project (one repo at a time)
 

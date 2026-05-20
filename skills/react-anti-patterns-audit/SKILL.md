@@ -80,7 +80,9 @@ Each check has the same structure: **smell example** (what the pattern looks lik
 {constantStaticHeaders.map((h, i) => <Header key={i} {...h} />)}  // ✓ never reorders, no internal state
 ```
 
-**Report shape**: file:line + the offending JSX node + the list source. If the list source can be statically proven append-only, the check defers to the human.
+Note: this case is genuinely rare in production. Most data has a more meaningful key candidate (`item.id`, `item.slug`, a hash of stable fields) — when in doubt, prefer those over the index. The check defers to the human if the list source can be statically proven append-only.
+
+**Report shape**: file:line + the offending JSX node + the list source.
 
 ### 2. `useEffect-for-derived-state`
 
@@ -97,6 +99,15 @@ useEffect(() => { setFullName(`${first} ${last}`); }, [first, last]);  // ⚠️
 const fullName = `${first} ${last}`;  // ✓ derived in render, no useEffect, no extra render
 ```
 
+**Also legitimate** — when the "derivation" genuinely requires a side effect (debounce, async fetch, subscription). Then `useEffect` is the right tool because the derived value can't be a pure render-time computation:
+
+```jsx
+useEffect(() => {
+  const handle = setTimeout(() => setDebouncedQuery(query), 300);
+  return () => clearTimeout(handle);
+}, [query]);  // ✓ async derivation; useEffect is correct here
+```
+
 **Report shape**: file:line of the `useEffect` + the state it sets + the equivalent derived expression.
 
 ### 3. `dep-array-lies`
@@ -107,10 +118,10 @@ const fullName = `${first} ${last}`;  // ✓ derived in render, no useEffect, no
 useEffect(() => { console.log(count); }, []);  // ⚠️ closes over count but won't update
 ```
 
-**Legitimate** — the dependency genuinely never changes (e.g. `useState` setters, refs).
+**Legitimate** — the dep array truthfully enumerates every value the effect closes over.
 
 ```jsx
-useEffect(() => { setCount(0); }, [setCount]);  // ✓ setCount is stable; technically can omit
+useEffect(() => { document.title = title; }, [title]);  // ✓ title is the actual dependency
 ```
 
 **Report shape**: file:line of the hook + the missing or extraneous identifier. `react-hooks/exhaustive-deps` ESLint rule catches most of these — this check confirms it's enabled and reports cases where it's disabled with a comment but the omission is real.
@@ -139,13 +150,19 @@ setItems([...items, newItem]);  // ✓ new array reference
 useEffect(() => { window.addEventListener('resize', handler); }, []);  // ⚠️ never removed
 ```
 
-**Legitimate** — the cleanup is genuinely a no-op (e.g. one-shot work that completes synchronously) or is wrapped in a manager that handles its own teardown.
+**Legitimate** — when the effect *does* acquire a resource, the cleanup matches it:
 
 ```jsx
 useEffect(() => {
   window.addEventListener('resize', handler);
   return () => window.removeEventListener('resize', handler);  // ✓
 }, []);
+```
+
+**Also legitimate** — when the effect *doesn't* acquire a resource at all (assigning to `document.title`, syncing local state, logging), no cleanup is needed and the check ignores it:
+
+```jsx
+useEffect(() => { document.title = `Inbox (${unread})`; }, [unread]);  // ✓ no listener / timer / subscription to clean up
 ```
 
 **Report shape**: file:line + the resource being acquired (listener / timer / subscription) + the missing cleanup pattern.
@@ -166,19 +183,28 @@ const [email, setEmail] = useState(props.initialEmail);  // ✓ prop name says "
 
 **Report shape**: file:line of the `useState(prop)` + a check for whether the prop name signals "initial" / "default" / "seed" (heuristic; the human decides).
 
+**Caveat**: the prop-name heuristic is brittle — many real codebases pass `props.email` and *do* mean "seed value" without the `initial*` prefix. Expect false positives; the human reviewer is the final judge. The check's value is surfacing the pattern for review, not auto-flagging bugs.
+
+## Flags
+
+- `--source <path>` — audit only the given directory (default: project root). Useful for monorepos: `--source packages/web` audits one package at a time.
+- `--force` — bypass the pre-flight bail. Records the override in the report header so the reader knows the audit ran without confirmation that the target is actually React. Use only when the pre-flight gives a known-wrong negative (React via CDN, workspace-package React types, etc.).
+
 ## Procedure
 
-1. **Pre-flight.** See the section above. Bail if not React.
+1. **Pre-flight.** See the section above. Bail if not React (unless `--force`).
 2. **Confirm scope.** If `--source <path>` was passed, audit only that directory. Otherwise audit the whole codebase under the project root.
 3. **For each check, scan the codebase.** Use `Glob` to enumerate `.jsx` / `.tsx` files, then `Read` (or grep with `Grep`) for the pattern. Six checks; each is a single pass. Sequential is fine — total tokens are manageable.
 4. **Aggregate findings.** For each match, capture: check name, file:line, the smelly snippet (3-5 lines for context), and a one-line note on why it matches the smell shape.
 5. **Apply immunity comments.** A `// audit:react:ignore <check-name> — <reason>` comment on the offending line excludes it from the report. This is the explicit-trust-boundary opt-out.
-6. **Write the report.** Markdown table under `docs/audits/react-anti-patterns-YYYY-MM-DD.md`. Severity is implicit (every finding is the same shape — concrete, fixable, file:line citable). Group by check; within each check, group by file.
+6. **Write the report.** Markdown table under `docs/audits/react-anti-patterns-YYYY-MM-DD.md`. **Create the `docs/audits/` directory if it doesn't already exist** (`mkdir -p`-equivalent — most projects don't have one). Severity is implicit (every finding is the same shape — concrete, fixable, file:line citable). Group by check; within each check, group by file.
 7. **Print the report path** and a one-line summary: `Wrote react-anti-patterns-YYYY-MM-DD.md — N findings across M files (checks: <comma-separated list of checks that fired>).`
 
 ## Output schema
 
-```markdown
+The outer fence below is 4 backticks so the inner 3-backtick code blocks render correctly on GitHub.
+
+````markdown
 # React anti-patterns audit — {YYYY-MM-DD}
 
 **Scope:** {project root or --source path}
@@ -209,7 +235,7 @@ const [email, setEmail] = useState(props.initialEmail);  // ✓ prop name says "
 The `items[]` list is rebuilt from the `useQuery` result on line 38; ordering can change between fetches. Switch to `key={item.id}` if items have a stable id, or `key={\`${item.foo}-${item.bar}\`}` if not.
 
 ...(further findings per check)...
-```
+````
 
 ## Token expectations
 
@@ -229,6 +255,7 @@ Cadence: per-PR for substantial component changes, ~30 invocations/year on an ac
 - **TypeScript without React types.** `.tsx` files exist but the React types are loaded via a workspace package that doesn't appear in this repo's `package.json`. Same workaround: `--force`.
 - **Class components.** The skill's six checks are hooks-shaped. Class-component patterns (componentDidMount-without-componentWillUnmount, this.state mutation) are NOT covered. Adding them would double the SKILL.md length and most modern React doesn't use classes. If you have a class-heavy codebase, run `mikko-audit` instead — it catches the underlying robustness shapes.
 - **Server Components / Next.js app router.** The checks assume client components. A Server Component with `useEffect` is itself a bug (RSCs can't use effects), but caught by the framework's compiler, not this skill. The audit will skip server-only files if it can identify them via `"use client"` or `"use server"` directives.
+- **React Native.** RN projects pass the pre-flight (they have `react` in `package.json` and `.jsx`/`.tsx` files), and five of the six checks are framework-agnostic and apply directly (`key-as-index-in-lists`, `useEffect-for-derived-state`, `dep-array-lies`, `state-mutation-instead-of-replace`, `multiple-sources-of-truth`). The sixth — `effect-cleanup-missing` — uses web-shaped examples; RN listeners use different APIs (`Dimensions.addEventListener`, `Keyboard.addListener`, `BackHandler.addEventListener`) that this check's grep patterns won't match in v1. Either run `--force` and accept some missed RN listeners, or wait for a future `react-native-anti-patterns-audit` that ports the examples.
 
 ## Limitations
 

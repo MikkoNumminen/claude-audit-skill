@@ -31,8 +31,7 @@ The source repo is the cloned `claude-skills` directory. The skill looks for it,
 
 1. **Current working directory** — if `cwd` contains `install-mikko.sh` AND a `skills/` directory, use cwd.
 2. **Parent directory of cwd** — walk up two levels checking for the same markers (handles "I'm in `<repo>/some/sub/dir/`").
-3. **Known sibling locations** — `D:/koodaamista/claude-skills/` on Windows, `~/koodaamista/claude-skills/` on Unix-likes. These are the canonical author-machine paths; harmless on a fresh checkout.
-4. **Ask the user once** — if none of the above hit, ask: "Where's your claude-skills clone? (full path)". Bail with a clear message if no answer.
+3. **Ask the user once** — if neither hits, ask: "Where's your claude-skills clone? (full path)". Bail with a clear message if no answer. Do NOT probe hardcoded author-specific paths — every fork lives somewhere different.
 
 Once located, verify by checking that `<source>/install-mikko.sh` and `<source>/skills/*/SKILL.md` both exist. Cache the resolved path in the conversation context for the rest of the turn.
 
@@ -43,11 +42,13 @@ The skill dispatches based on what the user asked for. Default to **install all*
 | Intent | Action |
 | --- | --- |
 | "install everything" / "install the mikko skills" / "update my mikko skills" | `bash <source>/install-mikko.sh` |
-| "what's new" / "list new skills" / "anything to install" | Glob source `skills/*/SKILL.md`, glob `~/.claude/skills/mikko-*/SKILL.md`, normalise names, diff. Print the source-but-not-installed names. |
-| "install `<name>`" | `bash <source>/install.sh <name> --target user` (uses `install.sh`, not `install-mikko.sh`, so this is a SYMLINK install keeping the source name). Note this skips the `mikko-` prefix unless `<name>` already has it. |
-| "install `<name>` with the mikko- prefix" | `cp -R <source>/skills/<name>/ ~/.claude/skills/mikko-<name>/` (mirrors what install-mikko.sh does for one skill) |
-| "uninstall `mikko-<name>`" | Confirm with the user once, then `rm -rf ~/.claude/skills/mikko-<name>`. **Always confirm before deleting.** |
-| "dry run" / "show me what would happen" | Add `--dry-run` to `install-mikko.sh`; for `install.sh` describe what would happen in chat without invoking. |
+| "what's new" / "list new skills" / "anything to install" | Glob `<source>/skills/*/SKILL.md` AND `~/.claude/skills/*/SKILL.md` (no prefix filter — see the diff-logic note below). Normalise names so `<source>/skills/foo/` maps to either `foo` or `mikko-foo` already installed. Print the source skills that aren't represented in any form in the install dir. |
+| "install `<name>`" (default — match the rest of the user's namespace) | `cp -R <source>/skills/<name>/ ~/.claude/skills/mikko-<name>/`. Mirrors what `install-mikko.sh` does for one skill; the result is `/mikko-<name>` as a slash command, matching every other `mikko-*` skill the user has. |
+| "install `<name>` without the mikko- prefix" / "install `<name>` symlinked" | `bash <source>/install.sh <name> --target user`. Symlink install, keeps the source name (no prefix). Use this only when the user explicitly wants the unprefixed name or live-update via `git pull` without re-running the installer. |
+| "uninstall `mikko-<name>`" | Confirm with the user once, then `rm -rf ~/.claude/skills/mikko-<name>`. **Always confirm before deleting.** Symlinked installs (without prefix) get the same treatment at `~/.claude/skills/<name>`. |
+| "dry run" / "show me what would happen" | Add `--dry-run` to `install-mikko.sh`; for the cp/rm paths describe what would happen in chat without invoking. |
+
+**Diff-logic note (for the "what's new" intent):** the user's namespace may be mixed — most skills are mikko-prefixed (from `install-mikko.sh`) but some may be unprefixed (from `install.sh <name>`). To avoid reporting `mikko-foo` as "new" when an unprefixed `foo` already exists, the diff compares **source skill names** against installed directory names treating `foo` and `mikko-foo` as equivalent. A source skill counts as "installed" if EITHER `~/.claude/skills/<name>/` OR `~/.claude/skills/mikko-<name>/` exists (or the source skill is already mikko-prefixed and `~/.claude/skills/<name>/` exists).
 
 ### 3. Execute the action
 
@@ -72,7 +73,7 @@ End the run with: `Claude Code picks up new skills on the next conversation turn
 Default (install all):
 
 ```
-mikko-install — source: D:/koodaamista/claude-skills
+mikko-install — source: <resolved-path-to-claude-skills>
 
 [install-mikko.sh output here]
 
@@ -82,7 +83,7 @@ installed 9 skill(s) into ~/.claude/skills/ (1 new, 8 updated)
 "What's new":
 
 ```
-mikko-install — source: D:/koodaamista/claude-skills
+mikko-install — source: <resolved-path-to-claude-skills>
 
 new skills available (not installed):
   mikko-readme-drift-sync

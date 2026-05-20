@@ -197,22 +197,22 @@ After the listing prints, attempt to locate the `claude-skills` source repo to s
 
 1. **Current working directory** — does it have `install-mikko.sh` AND a `skills/` directory? If yes, that's the source.
 2. **Parent directory of cwd** — walk up two levels checking for the same markers.
-3. **Known sibling locations** — `D:/koodaamista/claude-skills/` on Windows, `~/koodaamista/claude-skills/` on Unix-likes.
 
-If the source is found:
-- `Glob` `<source>/skills/*/SKILL.md` and read the `name:` from each.
-- Normalise to mikko-prefixed names (`audit` → `mikko-audit`; skills already prefixed stay as-is).
-- Compute the set difference: source - installed.
-- If non-empty, print a footer:
+If neither hits, **skip silently**. Don't badger the user about a possibly-missing repo, and don't probe hardcoded author-specific paths. This check is best-effort discovery, not a gate.
+
+If the source IS found:
+- `Glob` `<source>/skills/*/SKILL.md` and read the `name:` from each → set of source skills.
+- `Glob` `~/.claude/skills/*/SKILL.md` (note: NO `mikko-*` prefix filter — the user's namespace may be mixed; some skills install unprefixed via `install.sh`).
+- For each source skill, count it as "installed" if ANY of these match a real install-dir entry: the source name itself (`foo`), the mikko-prefixed form (`mikko-foo`), or the source name when already prefixed (`mikko-foo` source → look for `mikko-foo` install).
+- Set difference: source skills NOT represented in any installed form.
+- If non-empty, print a footer using a plain text marker — no emoji:
 
   ```
-  💡 N new skill(s) available since your last install:
+  NEW: N skill(s) available since your last install:
        mikko-readme-drift-sync
        mikko-foo
      Run /mikko-install to add them.
   ```
-
-If the source isn't found, skip silently — don't badger the user about a possibly-missing repo. This check is **best-effort discovery**, not a gate.
 
 ### 5. Done
 

@@ -16,7 +16,7 @@
 #   bash setup.sh --dry-run             # preview, write nothing
 #
 # Prereqs:
-#   - bash 4+
+#   - bash 3.2+ (macOS-stock bash is fine)
 #   - node 18+ (for the mikko-* installer)
 
 set -euo pipefail
@@ -27,7 +27,10 @@ DRY_RUN=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --target)   TARGET="$2"; shift 2 ;;
+        --target)
+            [[ -z "${2:-}" || "$2" == --* ]] && { echo "error: --target requires a value (user|project)" >&2; exit 2; }
+            TARGET="$2"; shift 2
+            ;;
         --yes|-y)   YES="yes"; shift ;;
         --dry-run)  DRY_RUN="--dry-run"; shift ;;
         -h|--help)
@@ -78,20 +81,10 @@ echo ""
 
 # 1. Legacy audit skill via install.sh.
 echo "[1/2] audit skill..."
-if [[ "$TARGET" == "user" ]]; then
-    if [[ -n "$DRY_RUN" ]]; then
-        echo "  (dry-run) would symlink/copy skill/ -> ~/.claude/skills/audit/"
-    else
-        bash "$REPO_ROOT/install.sh" --target user
-    fi
-else
-    PROJECT_PATH="$(pwd)"
-    if [[ -n "$DRY_RUN" ]]; then
-        echo "  (dry-run) would symlink/copy skill/ -> $PROJECT_PATH/.claude/skills/audit/"
-    else
-        bash "$REPO_ROOT/install.sh" --target project --repo "$PROJECT_PATH"
-    fi
-fi
+INSTALL_ARGS=("--target" "$TARGET")
+[[ "$TARGET" == "project" ]] && INSTALL_ARGS+=("--repo" "$(pwd)")
+[[ -n "$DRY_RUN" ]] && INSTALL_ARGS+=("--dry-run")
+bash "$REPO_ROOT/install.sh" "${INSTALL_ARGS[@]}"
 
 # 2. mikko-* namespace via bootstrap.sh.
 echo ""

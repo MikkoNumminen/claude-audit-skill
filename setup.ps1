@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#requires -Version 5.1
 # One-command setup for the claude-skills repo on Windows. Installs both
 # layouts in this repo:
 #
@@ -50,7 +51,7 @@ if (-not $Target) {
         $Target = 'user'
     } else {
         Write-Host "Where should the skills be installed?"
-        Write-Host "  1) user-wide    — `$HOME\.claude\skills\         (available in every project) [default]"
+        Write-Host "  1) user-wide    — $HOME\.claude\skills\         (available in every project) [default]"
         Write-Host "  2) project-only — $(Get-Location)\.claude\skills\   (available only when Claude Code runs here)"
         Write-Host ""
         $choice = Read-Host "Pick 1 or 2 [1]"
@@ -73,10 +74,10 @@ Write-Host ""
 
 # 1. Legacy audit skill via install.sh (Git Bash).
 Write-Host "[1/2] audit skill..."
-$installSh = Join-Path $RepoRoot 'install.sh'
+$installSh = Join-Path -Path $RepoRoot -ChildPath 'install.sh'
 if ($Target -eq 'user') {
     if ($DryRun) {
-        Write-Host "  (dry-run) would symlink/copy skill/ -> `$HOME\.claude\skills\audit\"
+        Write-Host "  (dry-run) would symlink/copy skill/ -> $HOME\.claude\skills\audit\"
     } else {
         & bash $installSh --target user
         if ($LASTEXITCODE -ne 0) { Write-Error "install.sh failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
@@ -94,7 +95,7 @@ if ($Target -eq 'user') {
 # 2. mikko-* namespace via bootstrap.ps1.
 Write-Host ""
 Write-Host "[2/2] mikko-* namespace..."
-$bootstrapScript = Join-Path $RepoRoot '.claude\skills\mikko-install\bootstrap.ps1'
+$bootstrapScript = Join-Path $RepoRoot '.claude' | Join-Path -ChildPath 'skills' | Join-Path -ChildPath 'mikko-install' | Join-Path -ChildPath 'bootstrap.ps1'
 $bootstrapArgs = @('-Source', $RepoRoot, '-Target', $Target)
 if ($Yes) { $bootstrapArgs += '-Yes' }
 if ($DryRun) { $bootstrapArgs += '-DryRun' }

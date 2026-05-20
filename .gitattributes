@@ -1,0 +1,15 @@
+# Default: let git auto-detect text vs binary.
+* text=auto
+
+# Force LF for files that POSIX shells and Node will execute. CRLF on a
+# `#!/usr/bin/env bash` line breaks the shebang on macOS / Linux.
+*.sh text eol=lf
+*.mjs text eol=lf
+
+# PowerShell + Windows batch can keep platform-native line endings.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Markdown is plain text — auto-detect is fine but pinning LF keeps diffs clean.
+*.md text eol=lf

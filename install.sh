@@ -11,6 +11,13 @@
 #   --target user              ~/.claude/skills/audit   (available in every project)
 #   --target project --repo P  P/.claude/skills/audit   (project-local)
 #
+# Flags:
+#   --dry-run                  Preview the install. Runs the same arg parsing,
+#                              source/dest resolution, and existence checks as
+#                              a real install; prints what would happen and
+#                              exits with the same exit code the real run would
+#                              produce (e.g. 3 if dest exists and isn't a symlink).
+#
 # Idempotent: re-running updates the symlink without duplicating.
 # Refuses to overwrite an existing non-symlink directory.
 
@@ -26,6 +33,7 @@ fi
 
 TARGET=""
 REPO=""
+DRY_RUN=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -37,8 +45,12 @@ while [[ $# -gt 0 ]]; do
             REPO="$2"
             shift 2
             ;;
+        --dry-run)
+            DRY_RUN="yes"
+            shift
+            ;;
         -h|--help)
-            sed -n 's/^# \{0,1\}//p' "$0" | head -n 10
+            sed -n 's/^# \{0,1\}//p' "$0" | head -n 18
             exit 0
             ;;
         *)
@@ -66,20 +78,39 @@ else
 fi
 
 DEST_PARENT="$(dirname "${DEST}")"
-mkdir -p "${DEST_PARENT}"
+if [[ -z "${DRY_RUN}" ]]; then
+    mkdir -p "${DEST_PARENT}"
+fi
 
 if [[ -L "${DEST}" ]]; then
     LINK_TARGET="$(readlink "${DEST}")"
     if [[ "${LINK_TARGET}" == "${SKILL_SRC}" ]]; then
-        echo "ok: symlink already present and correct -> ${DEST}"
+        if [[ -n "${DRY_RUN}" ]]; then
+            echo "already up-to-date: ${DEST}"
+        else
+            echo "ok: symlink already present and correct -> ${DEST}"
+        fi
+        exit 0
+    fi
+    if [[ -n "${DRY_RUN}" ]]; then
+        echo "would replace existing symlink (-> ${LINK_TARGET}) with -> ${SKILL_SRC}"
         exit 0
     fi
     echo "replacing existing symlink (-> ${LINK_TARGET})"
     rm "${DEST}"
 elif [[ -e "${DEST}" ]]; then
+    if [[ -n "${DRY_RUN}" ]]; then
+        echo "would refuse: ${DEST} exists and is not a symlink" >&2
+        exit 3
+    fi
     echo "error: ${DEST} exists and is not a symlink. Refusing to overwrite." >&2
     echo "       Remove or rename it manually, then rerun." >&2
     exit 3
+fi
+
+if [[ -n "${DRY_RUN}" ]]; then
+    echo "would install: ${DEST} -> ${SKILL_SRC}"
+    exit 0
 fi
 
 ln -s "${SKILL_SRC}" "${DEST}"

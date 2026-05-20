@@ -19,7 +19,7 @@ This skill is the antidote — every change must be traceable to a concrete drif
 - "update the README", "sync the README", "check README drift", "has the README fallen out of date"
 - "the README mentions X but we removed it last sprint", "are we still claiming Y in the README"
 - After a `release-cut` skill ran, before the next push — version bumps and new features tend to land before the README catches up
-- After adding a new `.claude/skills/*/SKILL.md` to a repo whose README enumerates its skills
+- After adding a new skill under `skills/*/` or `.claude/skills/*/` to a repo whose README enumerates its skills
 - Before merging a PR that changes `package.json` / `requirements.txt` / `Cargo.toml` / etc.
 - On a quarterly sweep across a portfolio of repos to catch silent drift
 
@@ -28,6 +28,7 @@ This skill is the antidote — every change must be traceable to a concrete drif
 - **Not** during initial README creation. There's no baseline voice to preserve and nothing to compare against. Write the first version by hand; this skill is the *maintenance* tool.
 - **Not** for a full rewrite. If the user wants to restructure the README, change the tagline, or move from prose to bullets (or vice versa), that's a different task — invoke this skill only when the *content* drifted, not the *form*.
 - **Not** for `CONTRIBUTING.md`, `CHANGELOG.md`, `SECURITY.md`, `docs/**`, or any other markdown file. The skill targets `README.md` only. A future `docs-drift-sync` could generalise.
+- **Not** for adding new sections that document existing-but-undocumented features unless the README explicitly claims completeness ("All flags:", "Full reference:"). For deliberate new-section authoring, the human writes the first draft; this skill is for keeping *existing* sections honest, not for ghostwriting fresh ones.
 - **Not** during unrelated code edits where the README isn't in scope. The harness will tempt to load the skill when "README" appears anywhere in the conversation — bail if the user is asking about something else and only mentioned the README in passing.
 - **Not** as a translation tool. Multilingual READMEs (FI/SV/EN side-by-side) are out of scope — handle only the language Claude is invoked in, flag the others.
 
@@ -67,10 +68,10 @@ Five axes, priority order. Each has a `Pattern`, a `How to detect`, a `Severity 
 
 ### 3. skill-drift
 
-- **Pattern.** `.claude/skills/*/SKILL.md` files exist that aren't in the README's skill list, or vice versa. Specific to repos whose README enumerates the skills they ship.
+- **Pattern.** Skill directories exist that aren't in the README's skill list, or vice versa. Specific to repos whose README enumerates the skills they ship.
 - **How to detect.**
-  1. `Glob` `.claude/skills/*/SKILL.md` (project-local) and read each frontmatter `name` field.
-  2. `Grep` the README for those names. If the README has a section like "## Skills" or "## What's in this repo" enumerating skills, compare the README's list against the directory listing.
+  1. `Glob` BOTH `skills/*/SKILL.md` (the layout this library uses at repo root) AND `.claude/skills/*/SKILL.md` (the Claude Code default for consumer repos). Deduplicate by basename — a skill can only live in one of the two locations in a given repo, but check both because conventions vary. Read each match's frontmatter `name` field.
+  2. `Grep` the README for those names. If the README has a section like "## Skills", "## What's in here", or "## What's in this repo" enumerating skills, compare the README's list against the directory listing.
   3. If the README has no skill-list section at all, this axis is **N/A** — don't invent one.
 - **Severity default.** Stale (README names a skill that no longer exists): **major**. Missing (skill exists but unlisted): **minor**.
 - **Suggested edit pattern.** Stale: remove the bullet/row, plus any prose that referred to it. Missing: add a row using the same shape (table row, bullet, code block) as adjacent skills. Use the skill's `description` from its frontmatter, summarised to one sentence in the README's voice.
@@ -209,7 +210,10 @@ These rules are blocking — apply them before recording any drift finding.
 
 ## Procedure
 
-1. **Pre-flight.** `Read` `README.md`. If it doesn't exist, bail with "no README.md to sync — this skill is for maintaining an existing README, not creating one. Write the first version by hand." If the file is under ~30 lines, warn: "short README — voice extraction may be unreliable; proceed with caution."
+1. **Pre-flight.**
+   - If the user's request is *vague* ("the README needs work", "fix the README", "clean up the README"), bail before doing anything and ask: "drift-sync runs five specific checks — file structure, dependencies, skills list, features (CLI flags / env vars / endpoints), and status claims (versions, test counts). Want me to run all five, or did you mean something else (restructure / tone change / new section)?" Wait for the answer. Don't extract a voice profile or run drift checks until the scope is confirmed.
+   - `Read` `README.md`. If it doesn't exist, bail with "no README.md to sync — this skill is for maintaining an existing README, not creating one. Write the first version by hand."
+   - If the file is under ~30 lines, warn: "short README — voice extraction may be unreliable; proceed with caution."
 
 2. **Extract voice profile** (or load cache if valid). See "Voice profile extraction" section. Write to `docs/audits/readme-drift-scratch.md`. **Create `docs/audits/` if it doesn't exist.**
 
@@ -267,21 +271,22 @@ The drift report's claims about *what changed in the repo* are auditable: every 
 
 ## Content calibration (against this repo's README, 2026-05-20)
 
-Mental run-through of the five checks against `claude-skills/README.md` (220 lines, single-skill repo):
+Mental run-through of the five checks against `claude-skills/README.md` at the point this skill landed (multi-skill library layout under `skills/<name>/`):
 
 | Check | Verdict | Notes |
 | --- | --- | --- |
-| file-structure-drift | **NO HITS (verified)** | Paths referenced (`docs/METHODOLOGY.md`, `skill/SKILL.md`, `LICENSE`, `install.sh`) all exist. Untracked `.claude/agent-verdicts/` is gitignored and not user-facing — correctly not in the README. |
-| dependency-drift | **N/A** | No `package.json` / `requirements.txt` / equivalent. The README claims no runtime stack beyond "Claude Code", which isn't a dep. |
-| skill-drift | **N/A** | This repo holds one skill at `skill/`, not a multi-skill `.claude/skills/` layout. README doesn't enumerate a skill list. |
-| feature-drift | **Possible (would need to verify install.sh flags)** | README documents `./install.sh --target project --repo <path>` and `./install.sh --target user`. The skill would `Grep` `install.sh` for those flag strings and confirm. Skipped in this mental run (task says don't execute). Likely no drift but worth a real run. |
-| status-drift | **NO HITS** | The "66 bugs, 26 fixed, 8 minutes" numbers are explicitly framed as historical ("the first time it ran") — dated-claim rule applies. No current-state count claims. |
+| file-structure-drift | **NO HITS (verified)** | Paths referenced in the README (`skills/<name>/SKILL.md` per row, `docs/METHODOLOGY.md`, `install.sh`, `install-mikko.sh`, `LICENSE`) all exist. |
+| dependency-drift | **N/A** | No `package.json` / `requirements.txt` / equivalent. The README claims no runtime stack — the skills are markdown recipes, not Node packages. |
+| skill-drift | **GROUNDED — 2 missing additions** | `Glob` `skills/*/SKILL.md` returns 8 directories: `audit`, `ai-codegen-smell-audit`, `mikko-audit-suite`, `mikko-help`, `react-anti-patterns-audit`, `readme-drift-sync`, `security-audit`, `skill-usage`. README's "What's in here" table lists 6 of them (audit, ai-codegen-smell-audit, security-audit, readme-drift-sync, skill-usage, mikko-help). **Missing:** `mikko-audit-suite`, `react-anti-patterns-audit`. Severity: minor each — the table doesn't explicitly claim completeness, but it reads as exhaustive and a reader skimming for "what's in here" would conclude wrongly. Suggested action: add two rows. |
+| feature-drift | **NO HITS (verified)** | README documents `./install.sh <name> --target user`, `./install.sh <name> --target project --repo <path>`, `./install.sh --list`, `./install-mikko.sh [--prefix X] [--dry-run]`. `Grep` against the two scripts confirms each flag exists. |
+| status-drift | **NO HITS** | No specific count claims, no version badge, no test-coverage claim in the current README to verify against. |
 
-**Calibration verdict.** 0 verified drifts on this README today. That's the expected baseline for an actively-maintained portfolio README — the skill becomes more useful on repos that have shipped features without README updates, or where a `release-cut` ran a week ago and the version bump hasn't propagated.
+**Calibration verdict.** 2 real drifts found, both minor missing-additions. This is the kind of finding the skill is meant to surface: the README quietly fell behind as PRs #3 (`react-anti-patterns-audit`) and #5 (`mikko-audit-suite`) shipped without updating the table. Worth a follow-up PR to add the two rows.
 
-**Calibration adjustments to the initial design:**
-- The original Step 2 framing of "skill drift" assumed every repo has a `.claude/skills/*/SKILL.md` layout. This repo uses `skill/` at root (single-skill convention). The skill should handle both — current detection (`Glob` `.claude/skills/*/SKILL.md`) is correct; just note that the result will be empty for single-skill repos and skill-drift becomes N/A.
-- The feature-drift check on a repo without a clear CLI may produce no signal at all. That's fine — the report should explicitly say "no CLI/API/env-var surface detected" rather than emit an empty section.
+**Calibration notes for the design:**
+- The skill-drift glob now correctly covers `skills/*/` AND `.claude/skills/*/`. The first calibration of this skill (drafted on an abandoned branch) hardcoded the `.claude/skills/` path and would have returned N/A on this repo — a false negative that the recursive-irony review caught.
+- The feature-drift check works well on a repo where the CLI surface is small and grep-able (install.sh + install-mikko.sh). On larger CLIs, the report should explicitly say "feature-drift skipped — too many flags/endpoints to enumerate without runtime instrumentation; flag CLI-surface drift by hand."
+- Re-run this calibration whenever a PR touches either `skills/` or the README. Stale calibration is the same disease the skill is meant to cure.
 
 ## Trigger calibration
 

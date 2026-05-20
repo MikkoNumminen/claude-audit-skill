@@ -369,3 +369,21 @@ non-overlapping by construction.
 - The skill does **not** find performance hotspots (profiling is a
   different tool) and does **not** grade architectural decisions
   (that is a design review, not an audit).
+
+## Token expectations
+
+Author estimate (not measured — run `/mikko-skill-usage` after a few
+invocations for receipts). For a small-to-medium repo (~50-300 source
+files):
+
+- Phase 1 (static analysis dispatch + capture): ~5K tokens in the main
+  thread; the tool runs are off-context.
+- Phase 2 (five parallel Sonnet sub-agents, one per scope): ~60-100K
+  tokens each, ~300-500K combined. This is where the cost lives.
+- Phase 3 (aggregation + index write): ~10-20K tokens output.
+
+**Total: ~25K main + ~400K dispatched ≈ ~425K per full run.** Smaller
+repos land closer to ~200K; large polyglot monorepos can exceed ~600K.
+
+Cadence: 1-2× per month per actively-iterating repo; quarterly on
+stable codebases. ~12-20 uses/year per repo for a regular caller.

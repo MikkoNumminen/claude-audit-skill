@@ -9,9 +9,11 @@ This repo started life as `claude-audit-skill` housing a single audit skill. It 
 | Skill                                                                       | What it does                                                                                                                                                                                                                                  | Status    |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
 | [`audit`](skills/audit/SKILL.md)                                            | Multi-phase robustness audit. Five parallel sub-agents review the codebase across resource lifecycle, data integrity, concurrency, error paths, and external boundaries. Produces `docs/audits/audit-YYYY-MM-DD.md` with severity-ranked bugs. | shipped   |
+| [`ai-codegen-smell-audit`](skills/ai-codegen-smell-audit/SKILL.md)          | Read-only audit for ten specific failure modes that LLM-generated code produces at higher rates than careful human authors (defensive guards on impossible cases, swallowed errors, single-use helpers, mirror tests, generic names in domain code, etc). Each check has a concrete smell example and a concrete legitimate counter-example so the auditor can tell signal from noise. Universal across codebases. | shipped   |
+| [`security-audit`](skills/security-audit/SKILL.md)                          | Multi-phase security audit + remediation. Attack-surface mapping → prioritized remediation plan → fixed one finding at a time with regression tests → AI-first security docs (SECURITY.md, threat model, lint rules). Each phase produces an artifact under `docs/security/` and STOPS at a gate for user approval. Critical findings surface immediately. | shipped   |
 | [`skill-usage`](skills/skill-usage/SKILL.md)                                | Measure actual Claude Code skill usage from local transcript JSONL files. Counts invocations and sums tokens per skill across all sessions in `~/.claude/projects/`. Emits a dated JSON that the portfolio's `/skill-registry` consumes as a receipt source. | shipped   |
 | [`mikko-help`](skills/mikko-help/SKILL.md)                                  | Personal helper: lists every installed `mikko-*` skill with its one-line description. Solves "I know I have a skill for this but can't remember which one." Useful as-is for anyone adopting the `mikko-` namespace; fork-friendly otherwise (search-and-replace the prefix to brand for yourself). | shipped   |
-| _planned: more audit variants (security, AI-codegen-smell, save-roundtrip)_ | port from the consumer repos where they currently live                                                                                                                                                                                        | upcoming  |
+| _planned: more audit variants (save-roundtrip-shape genericizer, copyright-scan generic version)_ | port from the consumer repos where they currently live, after a genericization pass to strip repo-specific data-shape knowledge.                                                                                                              | upcoming  |
 
 Each skill has its own SKILL.md with the full recipe — when to invoke, what it reads, what it writes, what it explicitly refuses to do. Read the SKILL.md to learn what a skill does; read [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) for the `audit` skill's design rationale specifically.
 
@@ -94,8 +96,13 @@ What's **not** in this repo: a marketplace, a registry, or any kind of "ratings"
 │   └── SKILLS.md                  per-skill token-economics catalog
 └── skills/
     ├── audit/
-    │   ├── SKILL.md               the audit recipe
+    │   ├── SKILL.md               the meta-architecture audit recipe
     │   └── evals/                 sample inputs and gold outputs
+    ├── ai-codegen-smell-audit/
+    │   ├── SKILL.md               ten LLM-codegen patterns and their counter-examples
+    │   └── evals/                 sample inputs and gold outputs
+    ├── security-audit/
+    │   └── SKILL.md               multi-phase security audit + remediation, gated per phase
     ├── skill-usage/
     │   ├── SKILL.md               the measurement recipe
     │   └── scan.mjs               companion script: scans ~/.claude/projects/*.jsonl

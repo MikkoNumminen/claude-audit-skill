@@ -604,6 +604,25 @@ The "Patterns observed but not in the checklist" section in the
 report exists exactly so future runs accumulate that evidence
 before the skill grows.
 
+## Token expectations
+
+Author estimate (not measured — run `/mikko-skill-usage` after a few
+invocations for receipts). For a small-to-medium codebase (~50-200
+source files):
+
+- Default scope (`src/`) with the 4-bundle parallel `Agent` fan-out:
+  ~5K main + ~15-25K per bundle × 4 bundles = ~65-105K total
+- Branch-diff scope (`git diff --name-only`): much smaller —
+  ~20-40K total, depending on diff size
+- Report assembly + false-positive log filtering: ~3-5K output
+
+**Total: ~50-100K tokens per full run on a default-scope repo;
+~20-40K on a branch-diff run.**
+
+Cadence: per-PR for substantial generated diffs, ~20-30 uses/year on
+an actively AI-paired repo; quarterly calibration sweeps on stable
+codebases.
+
 ## Things NOT to do
 
 - **Never modify code.** This skill is read-only. Suggested actions

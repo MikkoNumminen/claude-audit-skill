@@ -79,3 +79,26 @@ When the user invokes `/security-audit` and `docs/security/_progress.md` already
 - **Don't let the fixer expand scope.** A Phase 3 fix that "while I'm here" refactors unrelated code is rejected. Refactors go through `/audit`. Non-security bugs go to `docs/security/04-other-findings.md`.
 - **Don't commit on the agent's behalf without explicit user OK.** Default is staged-clean and hand back unless the orchestrator's prompt explicitly authorized auto-commit.
 - **Don't downgrade the cheat guards** in `src/lib/saveValidation.ts` to "fix" a security finding. Those guards ARE security; if a finding says "they're too strict", surface to the user and ask.
+
+## Token expectations
+
+Author estimate (not measured — run `/mikko-skill-usage` after a few
+invocations for receipts). The orchestrator itself is cheap (~5-10K
+per phase dispatch); the per-phase agents dominate, and the cost
+depends heavily on how many findings Phase 1 turns up.
+
+- Phase 0 (setup): ~5-10K total
+- Phase 1 (attack-surface map, security-auditor agent): ~50-100K
+- Phase 2 (findings + plan): ~30-60K
+- Phase 3 (per-finding fixes × N): ~30-80K **per finding**; a typical
+  audit lands 5-15 findings, so ~150-1000K aggregated across the phase
+- Phase 4 (documentation pass): ~40-80K
+- Phase 5 (verification): ~30-50K
+
+**Total per full audit: ~300K-1.2M tokens depending on findings count.**
+A scoped audit ("just the API routes") cuts Phase 1-2 by 2-3× but
+Phase 3 per-finding cost is unchanged.
+
+Cadence: 1-2× per year per repo for a full audit; quarterly for
+scoped passes on actively-iterating security-sensitive surfaces.
+~2-6 uses/year per repo.

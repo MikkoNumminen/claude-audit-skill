@@ -75,27 +75,17 @@ Write-Host ""
 # 1. Legacy audit skill via install.sh (Git Bash).
 Write-Host "[1/2] audit skill..."
 $installSh = Join-Path -Path $RepoRoot -ChildPath 'install.sh'
-if ($Target -eq 'user') {
-    if ($DryRun) {
-        Write-Host "  (dry-run) would symlink/copy skill/ -> $HOME\.claude\skills\audit\"
-    } else {
-        & bash $installSh --target user
-        if ($LASTEXITCODE -ne 0) { Write-Error "install.sh failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
-    }
-} else {
-    $projectPath = (Get-Location).Path
-    if ($DryRun) {
-        Write-Host "  (dry-run) would symlink/copy skill/ -> $projectPath\.claude\skills\audit\"
-    } else {
-        & bash $installSh --target project --repo $projectPath
-        if ($LASTEXITCODE -ne 0) { Write-Error "install.sh failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
-    }
-}
+$installArgs = @('--target', $Target)
+if ($Target -eq 'project') { $installArgs += @('--repo', (Get-Location).Path) }
+if ($DryRun) { $installArgs += '--dry-run' }
+
+& bash $installSh @installArgs
+if ($LASTEXITCODE -ne 0) { Write-Error "install.sh failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
 
 # 2. mikko-* namespace via bootstrap.ps1.
 Write-Host ""
 Write-Host "[2/2] mikko-* namespace..."
-$bootstrapScript = Join-Path $RepoRoot '.claude' | Join-Path -ChildPath 'skills' | Join-Path -ChildPath 'mikko-install' | Join-Path -ChildPath 'bootstrap.ps1'
+$bootstrapScript = Join-Path -Path $RepoRoot -ChildPath '.claude/skills/mikko-install/bootstrap.ps1'
 $bootstrapArgs = @('-Source', $RepoRoot, '-Target', $Target)
 if ($Yes) { $bootstrapArgs += '-Yes' }
 if ($DryRun) { $bootstrapArgs += '-DryRun' }

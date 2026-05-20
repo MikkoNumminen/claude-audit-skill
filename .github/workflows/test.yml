@@ -5,27 +5,47 @@ on:
     branches: [main]
   pull_request:
 
+# Least-privilege: tests are read-only. No commenting, no committing, no push.
+permissions:
+  contents: read
+
+# A new push to the same ref cancels any in-flight run for that ref. Saves CI
+# minutes during rapid PR iteration; production main pushes don't usually
+# collide so this is a clean win.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mjs-tests:
-    name: install.test.mjs (${{ matrix.os }})
+    name: install.test.mjs (${{ matrix.os }}, node ${{ matrix.node-version }})
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        # Test both the documented minimum (18) and the current LTS (20).
+        # Catches regressions if a Node 19+ API sneaks in.
+        node-version: ['18', '20']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
       - name: Run mikko-install smoke tests
         run: node .claude/skills/mikko-install/install.test.mjs
 
   sh-tests:
     name: install.test.sh (${{ matrix.os }})
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
+        # Windows skipped — Git Bash on the runner can't create symlinks
+        # without elevation. install.test.sh's can_symlink probe would skip
+        # the affected cases anyway, but spending CI minutes on a job that
+        # mostly skips isn't useful. The mjs job above covers Windows.
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:

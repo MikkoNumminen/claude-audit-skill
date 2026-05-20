@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Install the `audit` skill into a Claude Code skills directory.
+# Install the single `audit` skill (sourced from skill/SKILL.md in this repo)
+# into a Claude Code skills directory. This script handles ONLY that skill.
+#
+# For the mikko-* skill namespace under .claude/skills/mikko-*/, use the
+# `mikko-install` skill instead; its companion script lives at
+# .claude/skills/mikko-install/install.mjs. The two installers are independent
+# and this one is not deprecated — it still works as documented below.
 #
 # Two targets:
 #   --target user              ~/.claude/skills/audit   (available in every project)

@@ -148,6 +148,35 @@ The installer is careful: if the destination already exists and is
 not a symlink, it refuses to overwrite. Re-running is safe — it
 just checks and exits.
 
+## A second set of recipes lives here too
+
+The `install.sh` above only knows about the one audit recipe. This
+repo has since grown a separate shelf of recipe cards under
+`.claude/skills/mikko-*/`, each prefixed `mikko-` so they don't
+collide with anything else on your machine. Same file format as
+before — just more cards on a different shelf.
+
+Three of those cards are about the shelf itself rather than about
+your code:
+
+- **`mikko-help`** — the wizard. You ask "what mikko skills do I
+  have", and it lists every `mikko-*` card installed, what it does,
+  and which ones make sense for the codebase you're sitting in.
+- **`mikko-install`** — the installer for the new shelf. Same idea
+  as `install.sh`, but it copies or symlinks every `mikko-*` card
+  in one go, into either your project or your home directory.
+- **`mikko-skills`** — the inventory. A shorter, plainer list than
+  `mikko-help`. Useful when you just want to remember what's there.
+
+`install.sh` still handles the old `audit/` skill on its own. Once
+you've installed `mikko-install`, that's what you use for the
+`mikko-*` shelf. The two don't fight — they look at different
+folders.
+
+If you want to read one to see how a card is written, open
+[`.claude/skills/mikko-help/SKILL.md`](.claude/skills/mikko-help/SKILL.md).
+Same format as `skill/SKILL.md`, just smaller.
+
 ## Using it
 
 Open Claude Code in your project and type any of these:

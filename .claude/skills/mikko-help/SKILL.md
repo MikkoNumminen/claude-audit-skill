@@ -54,7 +54,9 @@ You don't have any mikko- skills installed yet. They live in a separate
 git repo you clone once, then install with one command.
 
 Steps:
-  1. git clone https://github.com/MikkoNumminen/claude-skills.git
+  1. Clone the `claude-skills` repo (or whichever repo you got these
+     skills from). Canonical default: github.com/MikkoNumminen/claude-skills
+     — swap in your fork's URL if you have one.
   2. cd into it (or anywhere)
   3. Run the installer skill:
 
@@ -90,14 +92,14 @@ The N / M / P numbers are filled in from the glob results. If P is 0 the project
 
 ## Token expectations
 
-~2K tokens per run (two globs + one stage decision + one short formatted print). The cheapest skill in the namespace by design — it's a door, not a desk.
+Two globs + one short formatted print. The cheapest skill in the namespace by design. Run `/mikko-skill-usage` for measured numbers.
 
 Cadence: a handful of times during onboarding, then almost never. Long-time users won't type `/mikko-help` because they know what comes next; they go straight to `/mikko-skills` or the specific skill they need.
 
 ## Failure modes
 
 - **`~/.claude/` doesn't exist.** Either Claude Code has never run on this machine, or the user is in a sandbox. Treat as Stage 0; the install command still applies.
-- **Globs return only `mikko-help` itself.** Awkward edge case — the user only has *this* skill installed. Treat as Stage 0 (effectively nothing useful installed yet) and add a one-line note: "(only mikko-help is installed; run /mikko-install to add the rest.)"
+- **Globs return only the three meta-skills (`mikko-help`, `mikko-install`, `mikko-skills`) with no audit or work skills.** Effectively-Stage-0: the user has the plumbing but none of the actual tools. Treat as Stage 0 and add a one-line note: "(only meta-skills installed — run /mikko-install --source <path> to add the audit skills.)"
 - **A SKILL.md is malformed.** Skip it silently in the count; this skill doesn't parse frontmatter beyond the existence check.
 
 ## Why two stages, not more

@@ -35,24 +35,16 @@ Pure inventory. Prints every installed `mikko-*` skill with its barney-style one
 ```
 your mikko-* skills:
 
-  mikko-audit
-    Looks for bugs in your code — leaks, races, swallowed errors, missing timeouts.
-    Five reviewers run in parallel, you get a list with file:line citations.
-
-  mikko-audit-suite
-    Runs every audit that fits this codebase, then writes one summary doc.
-
   mikko-help
     The "what do I do next" answer. Two stages: install → skills.
 
   mikko-install
     Installs (or updates, or removes) mikko- skills from a cloned source repo.
 
-  mikko-readme-drift-sync  (project)
-    Checks whether the README still matches the repo, and rewrites only the
-    parts that drifted — keeping the original author's voice.
+  mikko-skills
+    Lists your mikko- skills with one-line plain-English descriptions.
 
-  ...
+  ...  (more skills appear here after you install them)
 
 tip: pick one and type its slash command. For the next-step guide, use /mikko-help.
 ```
@@ -74,7 +66,7 @@ Skill name on its own line, barney indented two spaces below. Long barney lines 
 
 ## Token expectations
 
-~3K tokens per run (1-2 globs, 5-10 small reads, one formatted print). Cadence: a few times a week during active iteration, lower once names are memorized.
+One glob pair + N small reads + one formatted print. Cheap. Run `/mikko-skill-usage` for measured numbers. Cadence: a few times a week during active iteration, lower once names are memorized.
 
 ## Why this skill exists alongside `mikko-help`
 

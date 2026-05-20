@@ -8,6 +8,8 @@ barney: Installs (or updates, or removes) mikko- skills from a cloned source rep
 
 Manages installation of the `mikko-*` skill namespace. Reads skills from a source repo (a clone of `claude-skills` or similar) and writes them into Claude Code's skill directory.
 
+The deterministic work lives in **`install.mjs`** in this skill directory. SKILL.md is the procedure that drives the script; the script does the file I/O, hashing, and safety checks. Do not re-implement the file operations in the main thread — invoke `node install.mjs` with the appropriate flags.
+
 ## When to use
 
 - "install the mikko skills" / "install all mikko skills"
@@ -24,26 +26,35 @@ Manages installation of the `mikko-*` skill namespace. Reads skills from a sourc
 
 ## Flags
 
-- `--source PATH` — path to the source repo. If omitted, search: (1) cwd, (2) `D:/koodaamista/claude-skills/` on Windows or `~/koodaamista/claude-skills/` on Unix, (3) prompt.
+- `--source PATH` — path to the source repo. If omitted, probe cwd for `.claude/skills/mikko-*/SKILL.md` siblings; otherwise prompt and bail.
 - `--target user|project` — `user` → `~/.claude/skills/` (default). `project` → `<cwd>/.claude/skills/`.
 - `--only NAME` — restrict to the named skill. Repeatable. Default: all `mikko-*` skills in source.
-- `--method copy|symlink` — `copy` duplicates (default on Windows, safer without admin). `symlink` (default on macOS/Linux) picks up `git pull` updates automatically. On Windows `symlink` requires Developer Mode.
+- `--method copy|symlink` — `copy` duplicates (default on Windows, safer without admin). `symlink` (default on macOS/Linux) picks up `git pull` updates automatically. On symlink failure (Windows without Developer Mode) the script falls back to copy and writes a one-line stderr note.
 - `--uninstall` — remove the named skill(s). Requires `--only NAME` (refuses bulk uninstall).
+- `--force` — required when uninstalling or overwriting a skill whose installed copy doesn't match the source. Interactive only — see "Auto-mode and --force" below.
 - `--dry-run` — print what would happen, change nothing.
-- `--list` — show what's installed and where each one came from.
+- `--list` — show what's installed at the target and which source each entry came from.
 
 ## Procedure
 
-1. **Resolve source.** Use `--source` if set; else probe known locations; else ask once and bail if no answer.
-2. **Enumerate.** `Glob` `<source>/.claude/skills/mikko-*/SKILL.md`. The containing dir is one installable unit.
-3. **Filter by `--only`** if set.
-4. **Resolve target.** `~/.claude/skills/` or `<cwd>/.claude/skills/`. Create if missing.
-5. **Per skill**: if target exists and matches source (symlink to it, or copy with identical SKILL.md), report `already-up-to-date`. If target exists but differs, report `skipped (would overwrite — remove manually first)`. Otherwise install via chosen method.
-6. **Report.** One line per skill + summary count.
+1. **Resolve source.** Use `--source` if set; else probe cwd for `.claude/skills/mikko-*/SKILL.md` siblings; else prompt once and bail (exit 3) if no answer.
+2. **Resolve target.** `~/.claude/skills/` (default) or `<cwd>/.claude/skills/` per `--target`. Created on demand.
+3. **Listing (`--list`).** Walk the target directory; for each `mikko-*` entry, read its `.mikko-install-source` marker file (written by previous installs) to report where it came from. Symlinks are reported as `symlink`; bare copies without a marker show `(no .mikko-install-source marker — manual install?)`. No source resolution required.
+4. **Enumerate source skills.** `install.mjs` lists `<source>/.claude/skills/mikko-*/` directories that contain a `SKILL.md`.
+5. **Filter** by `--only` if set; error out if any requested name isn't in the source.
+6. **Per-skill directory-level comparison.** For each candidate, hash the entire skill directory (every file: `sha256(relpath + \0 + bytes)` per file, sorted by relpath, then hashed again) on both source and target side. The `.mikko-install-source` marker is excluded from the hash. If hashes match → `already-up-to-date`. If target exists with a different hash → `would-overwrite (rerun with --force or remove manually)` (never silently clobber). Otherwise install via the chosen method and write a fresh `.mikko-install-source` marker pointing at the source repo path.
+7. **Report.** One line per skill + summary count of installed / updated / up-to-date / skipped.
 
 ## Uninstall
 
-`--uninstall --only mikko-foo` removes the installed skill. Refuses unless the target is (a) a symlink to a known source or (b) a copy whose `SKILL.md` matches the source — protects against deleting a hand-edited local skill. Override with `--force` (the skill asks for confirmation; no auto-mode bypass).
+`--uninstall --only mikko-foo` removes the installed skill. If the installed copy's directory hash matches the source it's removed without ceremony. If it has drifted (or there's no matching source skill to compare against) the script refuses unless `--force` is also passed. See below.
+
+## Auto-mode and `--force`
+
+`--force` is needed for two situations: (a) overwriting a drifted installed skill on install/update, (b) uninstalling a drifted installed skill. In both cases:
+
+- **Interactive shell** (TTY present): the script prompts `[y/N]` before proceeding.
+- **Auto-mode** (no TTY, e.g. invoked headless by an orchestrator): the script refuses with exit code 4 and the message `auto-mode bypass refused — re-run in an interactive shell`. There is no env-var or flag to override; a hand-edited skill stays put until a human confirms.
 
 ## What this skill does NOT do
 
@@ -52,30 +63,35 @@ Manages installation of the `mikko-*` skill namespace. Reads skills from a sourc
 - Does not touch skills outside the `mikko-*` prefix.
 - Does not delete `docs/audits/` or other user artifacts. Uninstall removes the skill directory only.
 
-## Failure modes
+## Failure modes and exit codes
 
-- **Source not found.** Probes known locations; if none, asks once. If still nothing, exits with "I need a `--source PATH`".
-- **Target exists as a non-symlink, non-copy directory.** Refuses to overwrite. User removes/renames by hand, then re-runs.
-- **Symlink permission denied on Windows.** Falls back to copy with one-line note ("symlink failed — using copy. Enable Developer Mode for live updates.").
-- **Malformed source frontmatter.** Installs anyway (harness surfaces the parse error), but flags in the report: `installed mikko-foo (warning: frontmatter parse failed at line N)`.
+- **`0` success** — including idempotent no-ops and dry runs.
+- **`2` bad args** — unknown flag, bad `--target` value, `--uninstall` without `--only`, `--only` naming a skill not in source.
+- **`3` source not found** — `--source` path missing or no auto-detected source; cwd has no `mikko-*` siblings.
+- **`4` auto-mode bypass refused** — `--force` requested on a drifted skill without a TTY.
+- **Symlink permission denied** (Windows without Developer Mode) — script falls back to copy with one-line stderr note. Exit 0.
+- **Drifted installed copy** — reported as `would-overwrite`; user removes manually or passes `--force` in an interactive shell.
+- **Malformed source frontmatter** — installed anyway (harness surfaces the parse error at use time); not separately flagged here.
 
 ## Output format
 
 ```
-mikko-install — source: D:/koodaamista/claude-skills
+mikko-install — source: /path/to/claude-skills
+             target: /home/user/.claude/skills
+             method: symlink
 
-  mikko-ai-codegen-smell-audit     installed (copy)
-  mikko-audit                       installed (copy)
-  mikko-help                        installed (copy)
-  mikko-install                     installed (copy)
-  mikko-skills                       installed (copy)
+  mikko-ai-codegen-smell-audit  installed (symlink)
+  mikko-audit                   already-up-to-date
+  mikko-help                    would-overwrite (rerun with --force or remove manually)
+  mikko-install                 installed (symlink)
+  mikko-skills                  installed (symlink)
   ...
 
 N skills processed: X installed, Y updated, Z up-to-date, W skipped.
 
-next: run /mikko-skills to see what's now available.
+next: run /mikko-skills to see what is now available.
 ```
 
 ## Token expectations
 
-~3–5K tokens per run. Cadence: a handful per machine per year (initial, occasional updates, rare uninstalls).
+Most of the work is in `install.mjs` (file I/O, ~50ms–2s wall-clock for ~10 skills). Main-thread LLM tokens: ~2–3K for arg validation + output summary. Run `/mikko-skill-usage` for measured numbers after this skill has been used a few times.

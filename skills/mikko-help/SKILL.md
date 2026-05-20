@@ -1,6 +1,6 @@
 ---
 name: mikko-help
-description: List every installed `mikko-*` skill with its description. The fast answer to "I know I have a skill for this but can't remember which one" / "what mikko skills do I have" / "list my skills" / "remind me what's installed." Pass `--detect` for codebase-aware audit recommendations ("which audit should I run on this repo" / "what's relevant for this codebase"). Pass `--barney` for plain-English short descriptions ("give me the friendly version" / "plain-English list"). `--detect` and `--barney` combine independently. No sub-agents, no network, no measurements — just a table. Full mode docs live in the body's "Flags" section.
+description: List every installed `mikko-*` skill with its description (or with its `barney:` field when `--barney` is passed). The fast answer to "I know I have a skill for this but can't remember which one" / "what mikko skills do I have" / "list my skills" / "remind me what's installed." Pass `--detect` for codebase-aware audit recommendations ("which audit should I run on this repo" / "what's relevant for this codebase"). Pass `--barney` for plain-English short descriptions ("give me the friendly version" / "plain-English list"). `--detect` and `--barney` combine independently. No sub-agents, no network, no measurements — just a table. Full mode docs live in the body's "Flags" section.
 barney: Lists your mikko-* skills with their descriptions. Add --detect to also recommend which audits to run on THIS repo. Add --barney to swap descriptions for plain-English one-liners.
 ---
 

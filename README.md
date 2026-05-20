@@ -89,7 +89,7 @@ Both `description` and `barney` are author-written and editorial — the `descri
 
 **Length guideline for `barney`:** target around 140 characters so the table layout in `/mikko-help --barney` stays clean on a typical terminal width. Longer lines are fine in the SKILL.md itself; `mikko-help` truncates with an ellipsis when rendering the table. For comparison, the longest barney line in this library today is ~190 chars (security-audit) — readable in full when wrapped, but cropped in the listing.
 
-**Authoring guideline — when to write a `barney`:** Add one if the `description` is longer than ~3 sentences or reads as a contract rather than a tour. Short, friendly descriptions don't need a separate human-friendly version — a single field carrying both jobs is fine when it can manage that. Most audit-style skills naturally need both fields because their `description` is matching-surface-heavy.
+**Authoring guideline — when to write a `barney`:** Add one if the `description` is longer than ~3 sentences or reads as a contract rather than a tour. Short, friendly descriptions don't need a separate human-friendly version — a single field carrying both jobs is fine when it can manage that. Most skills with long descriptions (audits, orchestrators, anything contract-heavy like `mikko-help` itself) benefit from both fields.
 
 ## What's verifiable vs editorial
 

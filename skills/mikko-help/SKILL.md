@@ -191,7 +191,30 @@ If the frontmatter is malformed or the file has none, fall back to the parent di
 
 Sort by name. Find the longest skill name (cap at 24 chars; longer names get truncated with `…`). Pad to that width + 4 spaces, then print the truncated description. Use `printHTML` style if rendering through a terminal that supports color; plain print otherwise.
 
-### 4. Done
+### 4. Check for new skills (cheap, non-blocking)
+
+After the listing prints, attempt to locate the `claude-skills` source repo to see if there are skills in source that aren't installed yet. Probe order:
+
+1. **Current working directory** — does it have `install-mikko.sh` AND a `skills/` directory? If yes, that's the source.
+2. **Parent directory of cwd** — walk up two levels checking for the same markers.
+3. **Known sibling locations** — `D:/koodaamista/claude-skills/` on Windows, `~/koodaamista/claude-skills/` on Unix-likes.
+
+If the source is found:
+- `Glob` `<source>/skills/*/SKILL.md` and read the `name:` from each.
+- Normalise to mikko-prefixed names (`audit` → `mikko-audit`; skills already prefixed stay as-is).
+- Compute the set difference: source - installed.
+- If non-empty, print a footer:
+
+  ```
+  💡 N new skill(s) available since your last install:
+       mikko-readme-drift-sync
+       mikko-foo
+     Run /mikko-install to add them.
+  ```
+
+If the source isn't found, skip silently — don't badger the user about a possibly-missing repo. This check is **best-effort discovery**, not a gate.
+
+### 5. Done
 
 Print the tip line about `/mikko<Tab>` and `/mikko-skill-registry`, then exit. The whole skill should complete in under 5 seconds end-to-end.
 

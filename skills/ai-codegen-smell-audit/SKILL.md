@@ -29,14 +29,14 @@ skill is the antidote — every check is a specific testable pattern
 with a clear smell example and a clear legitimate example. If a
 finding cannot meet that bar, it does not appear.
 
-The skill is grounded against this repo (see "Calibration against
-src/" below). On AudiobookMaker's `src/` tree, two checks turn up
-verified hits — `stylistic-drift-within-file` and `generic-names-in-
-domain-context`. The remaining eight either find nothing here
-(this codebase has had careful human review) or are mixed/unclear
-pending finer analysis. That is the expected baseline; the skill
-becomes more useful on fresh AI-heavy diffs that have not yet been
-hand-reviewed.
+The skill is grounded against a real codebase (see "Provenance" at
+the bottom for the original calibration data). Two checks turned up
+verified hits on the calibration target — `stylistic-drift-within-file`
+and `generic-names-in-domain-context`. The remaining eight either
+found nothing (the calibration target had been carefully human-
+reviewed) or were mixed/unclear pending finer analysis. That is the
+expected baseline; the skill becomes more useful on fresh AI-heavy
+diffs that have not yet been hand-reviewed.
 
 ## When to invoke
 
@@ -524,15 +524,24 @@ So a malformed eval file fails the test suite, not silently at
 audit time. The schema is intentionally small — it catches drift,
 it does not validate semantic content.
 
-## Calibration against this repo (`src/`)
+## Provenance: original calibration against AudiobookMaker (2026-05-17)
 
-This calibration ran on AudiobookMaker's `src/` tree as part of the
-skill's initial build (2026-05-17). It is the empirical evidence we
-have on the checks against this repo today — not a claim that all
-ten checks are grounded here. **Citations were verified by
-spot-reading each cited line in the working tree on 2026-05-17**,
-not by grep alone — any "GROUNDED" row below names a specific line
-the auditor can open and see the pattern.
+The skill was authored inside [AudiobookMaker](https://github.com/MikkoNumminen/AudiobookMaker)
+and the first calibration ran against its `src/` tree on 2026-05-17. The
+table below is the empirical evidence the skill carried with it when it
+was promoted to the `claude-skills` library — concrete file:line citations
+showing which of the ten checks fired (or didn't) on a real codebase that
+had already been human-reviewed.
+
+Citations were verified by spot-reading each cited line in the AudiobookMaker
+working tree on 2026-05-17, not by grep alone — any "GROUNDED" row below
+names a specific line the original auditor could open and see the pattern.
+
+This is provenance, not a claim that any of the ten checks are inherently
+grounded in AudiobookMaker. A fresh calibration run against any codebase
+will produce a different shape. The value of keeping this table in the
+library SKILL.md is showing readers what a real run looks like before they
+invoke it on their own code.
 
 | Check | Verdict on this repo | Concrete hit (when grounded) |
 |---|---|---|

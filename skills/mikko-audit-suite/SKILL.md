@@ -76,7 +76,13 @@ For each audit in the recommendation list, `Glob` `~/.claude/skills/mikko-<name>
 
 Skills can't open interactive prompts mid-run. The convention is: **print the plan, end the assistant turn, wait for the user's next chat message.** Parse that next message: if it contains `yes`, `y`, or `confirm` (case-insensitive), the suite proceeds. Anything else (silence, `no`, a follow-up question) aborts cleanly with no audits dispatched.
 
-Estimated token costs are sourced at runtime from each audit's [`docs/SKILLS.md`](../../docs/SKILLS.md) row when present, falling back to the per-skill SKILL.md's `## Token expectations` section. Mark them clearly as **estimated** — the numbers drift as audits mature, and `/mikko-skill-usage`-measured values supersede them once available:
+Estimated token costs are sourced at runtime via this three-step fallback chain:
+
+1. **`docs/SKILLS.md`** in this repo (the per-skill catalog row) — preferred when present, because it's the canonical token-economics source the registry also reads.
+2. **Per-skill SKILL.md `## Token expectations` section** — fall back when `docs/SKILLS.md` doesn't have the row (e.g. for a skill not yet added to the catalog) or the file itself isn't found.
+3. **`?K (estimate unknown)`** — last-resort placeholder when neither source is parseable. The audit still gets dispatched; the confirmation just can't promise a number. Mark the row in the index later with the same `?K` if no measured number lands.
+
+Mark all numbers clearly as **estimated** — they drift as audits mature, and `/mikko-skill-usage`-measured values supersede them once available:
 
 ```
 mikko-audit-suite — about to run:
@@ -213,14 +219,14 @@ This is the most expensive skill in the catalog. The pre-flight + confirmation g
 - **All audits skipped.** If every audit in the matrix says "skip" for this codebase shape, the suite bails before invoking any. No index is written; the user sees the "nothing applicable" message.
 - **Security-audit's phase gate.** `security-audit` is multi-phase and waits for human approval between phases. The suite does NOT block indefinitely — when the gate hits, the orchestrator writes the partial index covering everything completed so far, marks `security-audit` as `⏸ gated`, and exits. The human finishes the phased audit independently (run `/mikko-security-audit` directly to resume). See section 3a above for the full rationale.
 - **`docs/audits/` doesn't exist.** Each audit creates its own subdirectory if needed; the suite then writes its index to `docs/audits/audit-suite-{date}.md` (creating `docs/audits/` if necessary, `mkdir -p`-equivalent).
-- **Cancelled mid-suite.** If the human Ctrl-Cs after the confirmation prompt, audits that already started complete; the index is written for whatever finished. The cancelled audit's row says `🚫 cancelled`.
+- **Cancelled mid-suite.** Behavior here depends on Claude Code's harness, not on the skill itself. If the human Ctrl-Cs (or the session aborts) after the confirmation prompt, in-flight tool calls *may* complete and write their report, or *may* be terminated before doing so — the SKILL.md author can't guarantee either. The suite is honest about this: any audit it has evidence of completing (a report file exists, `Read`-able) appears with its normal status (`✅ ok`, `❌ failed`, etc.); any audit it dispatched but has no evidence completed gets `🚫 cancelled` and a "(report write status unknown)" suffix. Confirm by opening the report path directly to see what landed.
 
 ## Limitations
 
 - **No flattening across reports.** The index links to each audit's report but doesn't merge findings into one mega-list. That's a separate concern.
 - **Sequential only.** Parallel dispatch would cut wall-clock time but introduces race conditions on shared file output. v1 is sequential; revisit if the wall-clock pain is real.
 - **No caching.** If you re-run the suite an hour later on an unchanged codebase, every audit re-runs from scratch. There's no smart "skip the audits whose source files haven't changed" logic. Add if needed.
-- **Matrix is duplicated from `/mikko-help --detect`.** If the matrix changes, both `mikko-help` and `mikko-audit-suite` need updating. Acceptable for two consumers; refactor into a shared doc if a third lands.
+- **Matrix is duplicated from `/mikko-help --detect`.** If the matrix changes, both `mikko-help` and `mikko-audit-suite` need updating. **Acceptable for two consumers; refactor into `docs/DETECTION.md` (shared doc) the moment a third consumer adopts it** — the cost of the duplication grows linearly with consumer count, the cost of the refactor doesn't, so the break-even is at consumer #3. Tracked here so the next person porting the matrix knows to do the extract instead of triple-duplicating.
 
 ## What this skill does NOT do
 

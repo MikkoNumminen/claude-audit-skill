@@ -46,9 +46,11 @@ The detector reads up to 5 root config files (`package.json`, `tsconfig.json`, `
 
 ### Bail conditions
 
-- No source code detected (empty directory, docs-only) → "no source code to audit; the suite has nothing to run."
-- All recommended audits would be `skipped` per the matrix → "no audits applicable to this codebase shape; the suite has nothing to run."
-- Required audits not installed under `~/.claude/skills/mikko-*/` → "missing audit skill(s): `mikko-X`. Install via `./install-mikko.sh` from claude-skills first, or pass `--partial` to run only the audits that ARE installed."
+Each abort produces a one-line error message and a clean exit (no index written):
+
+- **No source code detected** (empty directory, docs-only) → `"no source code to audit; the suite has nothing to run."`
+- **All recommended audits would be skipped** per the matrix → `"no audits applicable to this codebase shape; the suite has nothing to run."`
+- **Required audits not installed** under `~/.claude/skills/mikko-*/` → `"missing audit skill(s): mikko-X, mikko-Y. Install via ./install-mikko.sh from claude-skills first, or pass --partial to run only the audits that ARE installed."` (the `--partial` flag is documented in the "Flags" section below.)
 
 ## Procedure
 
@@ -72,22 +74,32 @@ For each audit in the recommendation list, `Glob` `~/.claude/skills/mikko-<name>
 
 ### 3. Confirm with the human
 
-Print the planned invocation order + estimated total token cost (sum of each audit's documented `tokens_per_use`):
+Skills can't open interactive prompts mid-run. The convention is: **print the plan, end the assistant turn, wait for the user's next chat message.** Parse that next message: if it contains `yes`, `y`, or `confirm` (case-insensitive), the suite proceeds. Anything else (silence, `no`, a follow-up question) aborts cleanly with no audits dispatched.
+
+Estimated token costs are sourced at runtime from each audit's [`docs/SKILLS.md`](../../docs/SKILLS.md) row when present, falling back to the per-skill SKILL.md's `## Token expectations` section. Mark them clearly as **estimated** — the numbers drift as audits mature, and `/mikko-skill-usage`-measured values supersede them once available:
 
 ```
 mikko-audit-suite — about to run:
 
-  /mikko-react-anti-patterns-audit  (~25K tokens)
-  /mikko-ai-codegen-smell-audit     (~10K tokens)
-  /mikko-audit                       (~25K tokens main + 5×~80K parallel Sonnet = ~425K total)
-  /mikko-security-audit              (~5K main + per-phase Sonnet, gated)
+  /mikko-react-anti-patterns-audit  (~25K tokens, estimated)
+  /mikko-ai-codegen-smell-audit     (~10K tokens, estimated)
+  /mikko-audit                       (~25K main + 5×~80K parallel Sonnet ≈ ~425K total, estimated)
+  /mikko-security-audit              (~5K main + per-phase Sonnet, gated — phases 0+1 typically ≈ ~50-100K before approval)
 
-estimated total: ~485K tokens, ~30-60min wall-clock (security-audit is phased and pauses for approval)
+estimated total: ~485K-535K tokens, ~30-60min wall-clock (security-audit is phased and pauses for approval; see "phase-gated audits" below for how the suite handles that)
 
-continue? [y/N]
+reply 'yes' to proceed, anything else aborts.
 ```
 
-Wait for `y` / `yes` / explicit confirmation. Anything else aborts the suite without running any audit. This is the **one** approval gate; once confirmed, the suite runs through without further prompts (each individual audit may have its own gates — e.g. `security-audit`'s phase gates — that fire as normal).
+Once confirmed, the suite runs through without further prompts. Individual audits may still have their own gates — see the next section for how the orchestrator handles them.
+
+### 3a. Handling phase-gated audits
+
+`security-audit` (and any future skill with its own phase gates) pauses for human approval between phases. **The suite does NOT block indefinitely waiting** — that would be a UX trap (the orchestrator could be blocked for hours / days). Instead:
+
+- When a dispatched audit hits a gate it can't auto-clear, the orchestrator marks that audit's row in the index as `⏸ gated`, writes the **partial** index immediately (covering all already-completed audits), and exits with a one-line note: `security-audit is at its phase gate; partial index written. Resume security-audit independently when you're ready.`
+- The human then either runs `/mikko-security-audit` directly to finish the phased run, or re-invokes `/mikko-audit-suite` later (which will skip the already-completed audits via the absence of stale `docs/audits/<name>-{today}.md` files if today's reports already exist).
+- The index can be updated by hand after the gated audit finishes, or it stays partial — both are acceptable. The suite does not auto-watch for completion.
 
 ### 4. Run the audits, in order
 
@@ -99,9 +111,21 @@ For each audit in the list, invoke it by name. The slash-command invocation trig
 
 If an audit fails (pre-flight bail, malformed config, crash), log the failure inline and continue with the next audit. The suite produces a partial index. Don't abort the whole suite for one audit's failure.
 
+**Flag pass-through.** The `--source <path>` flag (when present on the suite invocation) is forwarded to each dispatched audit **only if that audit documents support for it**. Today, `react-anti-patterns-audit` is the only audit that explicitly accepts `--source`; the universal audits (`audit`, `ai-codegen-smell-audit`, `security-audit`) don't and would either error or silently ignore the flag. The orchestrator skips the pass-through for audits without documented support. This is a known limitation; standardising `--source` across every audit skill is tracked as portability work for the next audit-skill iteration.
+
 ### 5. Write the index
 
-After all audits complete (or fail), write `docs/audits/audit-suite-YYYY-MM-DD.md` linking to each individual report:
+After all audits complete, fail, or hit an unblockable gate, write `docs/audits/audit-suite-YYYY-MM-DD.md` linking to each individual report. **The index is always written, even when every audit failed or got skipped** — the partial index is still useful evidence of what was attempted and which audit's failure mode to investigate next.
+
+**Extracting per-audit findings counts.** Each row's "Findings" column should be a single integer when possible. After each audit completes, the orchestrator `Read`s the first ~20 lines of its report and looks for:
+
+- A `## Summary` table with one column being a `Findings` count (used by `react-anti-patterns-audit`), OR
+- A `## Aggregate` / `## Severity rollup` table with severity buckets that sum to the total (used by `audit`), OR
+- A `Total: N findings` / `N findings` line near the top.
+
+If none of these are parseable, mark the row's count as `—` (em-dash) and let the linked report itself be the source of truth. The orchestrator never invents a number it can't anchor in the report.
+
+Index format:
 
 ````markdown
 # Audit suite — {YYYY-MM-DD}
@@ -132,7 +156,7 @@ After all audits complete (or fail), write `docs/audits/audit-suite-YYYY-MM-DD.m
 
 This index aggregates **report paths and counts** — it doesn't synthesise findings across audits. Each report stands on its own; the suite's value is having them all run in one go, not having them collapsed into one mega-report.
 
-If you want a flat list of every finding across every audit, that's a [future `audit-flatten` skill](https://github.com/MikkoNumminen/claude-skills/issues), not this one.
+If you want a flat list of every finding across every audit, that's a future `audit-flatten` skill (not currently tracked as an issue — open one when the need is concrete).
 ````
 
 ### 6. Done
@@ -147,9 +171,9 @@ The human reviews the index and decides which audit's findings to dig into first
 
 ## Flags
 
-- `--partial` — bypass the "all audits must be installed" check. Run only the audits that ARE installed; note any missing ones in the index. Useful when you know some skills aren't installed and don't care.
-- `--source <path>` — pass this same flag to every dispatched audit. Limits the audit scope to a single directory across all of them.
-- `--skip <skill-name>` — exclude a specific audit even if the matrix would recommend it. Repeatable: `--skip security-audit --skip ai-codegen-smell-audit`.
+- `--partial` — bypass the "all audits must be installed" check. Run only the audits that ARE installed; note any missing ones in the index with a `❓ not installed` status row. Useful when you know some skills aren't installed and don't care.
+- `--source <path>` — pass this flag to every dispatched audit **that documents support for it**. Today that's only `react-anti-patterns-audit`; passing `--source` for a suite run that includes other audits will limit React-specific scope but leave the universals running on the full project root. See step 4 ("Flag pass-through") for the rationale.
+- `--skip <library-canonical-name>` — exclude a specific audit even if the matrix would recommend it. Use the library-canonical name (`security-audit`, `audit`, `ai-codegen-smell-audit`, `react-anti-patterns-audit`), NOT the prefixed install name. Repeatable: `--skip security-audit --skip ai-codegen-smell-audit`. The orchestrator translates between canonical names (the matrix's vocabulary) and installed names (`~/.claude/skills/mikko-<name>/`) internally.
 
 ## Token expectations
 
@@ -174,7 +198,7 @@ This is the most expensive skill in the catalog. The pre-flight + confirmation g
 
 - **One audit crashes mid-suite.** The suite logs the failure, marks the audit's row in the index as `❌ failed`, and continues with the next. Index is partial; no rerun is triggered automatically.
 - **All audits skipped.** If every audit in the matrix says "skip" for this codebase shape, the suite bails before invoking any. No index is written; the user sees the "nothing applicable" message.
-- **Security-audit's phase gate.** `security-audit` is multi-phase and waits for human approval between phases. The suite invokes it and waits; the index marks it as `⏸ gated` until the human re-runs the suite (or finishes security-audit independently).
+- **Security-audit's phase gate.** `security-audit` is multi-phase and waits for human approval between phases. The suite does NOT block indefinitely — when the gate hits, the orchestrator writes the partial index covering everything completed so far, marks `security-audit` as `⏸ gated`, and exits. The human finishes the phased audit independently (run `/mikko-security-audit` directly to resume). See section 3a above for the full rationale.
 - **`docs/audits/` doesn't exist.** Each audit creates its own subdirectory if needed; the suite then writes its index to `docs/audits/audit-suite-{date}.md` (creating `docs/audits/` if necessary, `mkdir -p`-equivalent).
 - **Cancelled mid-suite.** If the human Ctrl-Cs after the confirmation prompt, audits that already started complete; the index is written for whatever finished. The cancelled audit's row says `🚫 cancelled`.
 

@@ -28,18 +28,18 @@ The current description (excerpt of trigger language):
 | 5 | "rewrite the README in a more formal tone" | NOT fire | NOT fire | ✅ | "Rewrite" matches the "full rewrites" exclusion; tone change is structural, not drift. |
 | 6 | "update CONTRIBUTING.md to mention the new test command" | NOT fire | NOT fire | ✅ | "CONTRIBUTING.md" matches the explicit exclusion. |
 | 7 | "after the release-cut, make sure all the docs are up to date" | fire | fire | ✅ | "After release-cut" + "docs up to date" matches. NOTE: "all the docs" is broader than README, but the skill is README-only — it will fire AND should bail with "this skill is README-only; for other docs, edit by hand or ask for a different skill." |
-| 8 | "add a section to the README about how to deploy" | NOT fire | NOT fire | ✅ | **Fixed**: SKILL.md "When NOT to invoke" now has an explicit "Not for adding new sections that document existing-but-undocumented features" bullet. The skill's `description` still includes "drift"-shaped triggers; combined with the new exclusion bullet, the classifier should now route this to "not for this skill" or, if it does fire, the skill itself reads the new bullet and bails. |
+| 8 | "add a section to the README about how to deploy" | NOT fire (end-state) | fire-then-bail | ✅ | **Fixed via body-level catch**, not classifier change. The `description:` field wasn't modified, so the classifier still loads the skill on phrases that partially overlap with documented triggers ("README" + verb). SKILL.md's "When NOT to invoke" section now contains an explicit "Not for adding new sections that document existing-but-undocumented features" bullet — once the skill loads, it reads its own body and bails. Effective outcome is no work done; mechanism is the same as case #10's vague-request bail. |
 | 9 | "the README feels out of date, can you check it" | fire | fire | ✅ | "Out of date" matches "has the README fallen out of date". |
 | 10 | "the README needs work" | 🟡 ambiguous | fire-then-bail | 🟡 | **Resolved**: SKILL.md Procedure step 1 now starts with an explicit vague-request bail. The skill fires (the description has broad-enough wording that it loads), but immediately stops to ask the user "drift-sync runs five specific checks... want all five, or did you mean something else?" Wait for clarification before extracting voice or running drift checks. Bail-to-clarification is the intended behavior, not a misfire. |
 
 ## Summary
 
 - **Correct fires:** 5 (#1, 2, 3, 7, 9)
-- **Correct non-fires:** 4 (#4, 5, 6, 8)
+- **Correct non-fires:** 3 (#4, 5, 6)
+- **Fire-then-bail (correct end-state, body-level catch):** 2 (#8, #10)
 - **Misfires:** 0
-- **Bail-to-clarification:** 1 (#10) — intentional, not a misfire; handled by Procedure step 1's vague-request bail
 
-10/10 route correctly after the SKILL.md fixes for #8 and #10.
+10/10 reach the correct end-state after the SKILL.md fixes. Two of those (#8 and #10) get there via body-level catches rather than classifier-level routing — see the rows for the mechanism.
 
 ## Applied changes
 

@@ -23,6 +23,7 @@ function parseArgs(argv) {
     method: null, // resolved later
     uninstall: false,
     force: false,
+    adopt: false,
     dryRun: false,
     list: false,
     help: false,
@@ -35,6 +36,7 @@ function parseArgs(argv) {
     else if (a === '--method') out.method = argv[++i] ?? null;
     else if (a === '--uninstall') out.uninstall = true;
     else if (a === '--force') out.force = true;
+    else if (a === '--adopt') out.adopt = true;
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--list') out.list = true;
     else if (a === '-h' || a === '--help') out.help = true;
@@ -57,7 +59,9 @@ Flags:
   --only NAME         restrict to one skill (repeatable)
   --method copy|symlink  default: copy on Windows, symlink elsewhere
   --uninstall         remove named skill(s) — requires --only
-  --force             allow uninstall of hand-edited skill (interactive only)
+  --force             allow uninstall/update of hand-edited skill (interactive only)
+  --adopt             claim and replace an unmanaged (no-marker) install
+                      — interactive only unless combined with --force
   --dry-run           print actions, write nothing
   --list              show what's installed at the target
 
@@ -388,18 +392,44 @@ async function runInstall(args, sourceDir, targetDir, sourceSkills) {
       // Drift. Refuse silent overwrite.
       const marker = readMarker(dstSkill);
       const fromUs = marker !== null;
+
+      // Marker-bearing drift: --force updates it.
       if (fromUs && args.force) {
         if (args.dryRun) {
           console.log(`  ${pad(name, maxLen + 2)} would update (drift, --force)`);
         } else {
           const used = tryInstall(srcSkill, dstSkill, method);
-          writeMarker(dstSkill, sourceDir);
+          if (used === 'copy') writeMarker(dstSkill, sourceDir);
           console.log(`  ${pad(name, maxLen + 2)} updated (${used}, was drifted)`);
         }
         updated++;
         continue;
       }
-      console.log(`  ${pad(name, maxLen + 2)} would-overwrite (rerun with --force or remove manually)`);
+
+      // Unmanaged drift (no marker — pre-existing or manual install): --adopt
+      // claims it. In auto-mode (no TTY) require --force too, mirroring the
+      // uninstall flow — explicit user intent is needed because the existing
+      // content may be hand-authored work the user wants to keep.
+      if (!fromUs && args.adopt) {
+        if (!isInteractive() && !args.force) {
+          console.error(`error: --adopt requested for ${name} but no TTY detected.`);
+          console.error('auto-mode bypass refused — re-run with --force or in an interactive shell');
+          process.exit(4);
+        }
+        if (args.dryRun) {
+          console.log(`  ${pad(name, maxLen + 2)} would adopt + replace (no marker)`);
+        } else {
+          const used = tryInstall(srcSkill, dstSkill, method);
+          if (used === 'copy') writeMarker(dstSkill, sourceDir);
+          console.log(`  ${pad(name, maxLen + 2)} adopted (${used}, replaced unmanaged install)`);
+        }
+        updated++;
+        continue;
+      }
+
+      // Otherwise, refuse.
+      const hint = fromUs ? '--force' : '--adopt (to claim unmanaged install)';
+      console.log(`  ${pad(name, maxLen + 2)} would-overwrite (rerun with ${hint} or remove manually)`);
       skipped++;
       continue;
     }

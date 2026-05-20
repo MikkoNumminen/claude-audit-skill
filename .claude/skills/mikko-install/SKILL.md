@@ -31,7 +31,8 @@ The deterministic work lives in **`install.mjs`** in this skill directory. SKILL
 - `--only NAME` — restrict to the named skill. Repeatable. Default: all `mikko-*` skills in source.
 - `--method copy|symlink` — `copy` duplicates (default on Windows, safer without admin). `symlink` (default on macOS/Linux) picks up `git pull` updates automatically. On symlink failure (Windows without Developer Mode) the script falls back to copy and writes a one-line stderr note.
 - `--uninstall` — remove the named skill(s). Requires `--only NAME` (refuses bulk uninstall).
-- `--force` — required when uninstalling or overwriting a skill whose installed copy doesn't match the source. Interactive only — see "Auto-mode and --force" below.
+- `--force` — required when uninstalling or overwriting a skill whose installed copy doesn't match the source (skills with a `.mikko-install-source` marker, i.e. previously installed by this script). Interactive only — see "Auto-mode and --force / --adopt" below.
+- `--adopt` — claim and replace an unmanaged install: a `mikko-*` directory that exists in the target but has NO `.mikko-install-source` marker (typically: a pre-existing manual install, or a previous mikko-help/mikko-skills directory before this skill existed). Like `--force`, interactive only unless combined with `--force` for auto-mode use.
 - `--dry-run` — print what would happen, change nothing.
 - `--list` — show what's installed at the target and which source each entry came from.
 
@@ -49,12 +50,28 @@ The deterministic work lives in **`install.mjs`** in this skill directory. SKILL
 
 `--uninstall --only mikko-foo` removes the installed skill. If the installed copy's directory hash matches the source it's removed without ceremony. If it has drifted (or there's no matching source skill to compare against) the script refuses unless `--force` is also passed. See below.
 
-## Auto-mode and `--force`
+## Auto-mode and `--force` / `--adopt`
 
-`--force` is needed for two situations: (a) overwriting a drifted installed skill on install/update, (b) uninstalling a drifted installed skill. In both cases:
+Two flags can bypass the "don't silently clobber" rule:
 
-- **Interactive shell** (TTY present): the script prompts `[y/N]` before proceeding.
-- **Auto-mode** (no TTY, e.g. invoked headless by an orchestrator): the script refuses with exit code 4 and the message `auto-mode bypass refused — re-run in an interactive shell`. There is no env-var or flag to override; a hand-edited skill stays put until a human confirms.
+- `--force` — for skills the script previously installed (have a `.mikko-install-source` marker) that have since drifted from source. Works in both interactive and auto-mode.
+- `--adopt` — for skills that exist at the target but have NO marker (manual install, or pre-existing skill from before this installer existed). Works in interactive shells; **requires `--force` in auto-mode** to confirm explicit user intent.
+
+In auto-mode (no TTY, e.g. invoked headless by an orchestrator):
+
+- `--adopt` alone → refuses with exit code 4 and the message `auto-mode bypass refused — re-run with --force or in an interactive shell`.
+- `--adopt --force` → proceeds. Combining the flags is the explicit "I really mean it" signal for scripted/CI use.
+
+The asymmetry is deliberate: a marker-bearing drift is provably from a previous install (the script's own work); an unmanaged install could be a hand-edited skill the user wants to keep. Adopting it deserves an extra word of confirmation.
+
+### Bootstrap (first-time install)
+
+If you're upgrading from a previous catalog-reader `mikko-help` (which had no marker), the script will refuse to overwrite it on first run. Either:
+
+- Run the included bootstrap helper: `bash bootstrap.sh` (POSIX) or `pwsh bootstrap.ps1` (Windows). It runs the installer with `--adopt --force` after listing what would change.
+- Or run manually: `node install.mjs --source <repo> --target user --method copy --adopt --force`.
+
+After the first install, all subsequent updates work without `--adopt` — the marker is in place.
 
 ## What this skill does NOT do
 

@@ -159,19 +159,40 @@ before — just more cards on a different shelf.
 Three of those cards are about the shelf itself rather than about
 your code:
 
-- **`mikko-help`** — the wizard. You ask "what mikko skills do I
-  have", and it lists every `mikko-*` card installed, what it does,
-  and which ones make sense for the codebase you're sitting in.
-- **`mikko-install`** — the installer for the new shelf. Same idea
-  as `install.sh`, but it copies or symlinks every `mikko-*` card
-  in one go, into either your project or your home directory.
-- **`mikko-skills`** — the inventory. A shorter, plainer list than
-  `mikko-help`. Useful when you just want to remember what's there.
+- **`mikko-help`** — the wizard. You ask "what do I do next", and it
+  looks at what's installed and points you at the one command to run
+  next. No listing, no recommendations — just a door.
+- **`mikko-install`** — the installer for the new shelf. Copies or
+  symlinks every `mikko-*` card in one go, into either your project
+  or your home directory. Idempotent. Refuses to clobber anything it
+  didn't put there itself.
+- **`mikko-skills`** — the inventory. A short, plain list of what's
+  on the shelf right now, one friendly line per card.
 
-`install.sh` still handles the old `audit/` skill on its own. Once
-you've installed `mikko-install`, that's what you use for the
-`mikko-*` shelf. The two don't fight — they look at different
-folders.
+`install.sh` still handles the old `audit/` skill on its own. The
+`mikko-install` card handles the `mikko-*` shelf. The two don't
+fight — they look at different folders.
+
+### First time on this shelf
+
+There's a small chicken-and-egg: you can't run `/mikko-install` until
+`mikko-install` is installed. So the first time, you run its little
+helper script directly. There's one for Windows and one for
+everything else:
+
+```bash
+bash .claude/skills/mikko-install/bootstrap.sh
+```
+
+```powershell
+powershell -File .claude\skills\mikko-install\bootstrap.ps1
+```
+
+Either one copies the three cards above into `~/.claude/skills/` (use
+`--target project` instead if you want them only inside this repo),
+including replacing any older `mikko-help` you might already have. Once
+that's done, restart Claude Code and the new cards are live. From then
+on, `/mikko-install` is the way to update — no bootstrap needed.
 
 If you want to read one to see how a card is written, open
 [`.claude/skills/mikko-help/SKILL.md`](.claude/skills/mikko-help/SKILL.md).

@@ -268,5 +268,74 @@ test('--uninstall --force on drift without TTY → exit 4', () => {
   } finally { fx.cleanup(); }
 });
 
+test('unmanaged install (no marker) → would-overwrite, hint mentions --adopt', () => {
+  const fx = makeFixture();
+  try {
+    const home = path.join(fx.root, 'fakehome');
+    fs.mkdirSync(home);
+    const env = process.platform === 'win32'
+      ? { USERPROFILE: home, HOMEDRIVE: '', HOMEPATH: '' }
+      : { HOME: home };
+    // Simulate an unmanaged install: a mikko-foo dir with different content
+    // and NO .mikko-install-source marker.
+    const unmanaged = path.join(home, '.claude', 'skills', 'mikko-foo');
+    fs.mkdirSync(unmanaged, { recursive: true });
+    fs.writeFileSync(path.join(unmanaged, 'SKILL.md'), '---\nname: mikko-foo\n---\n# old version\n');
+    const r = run(['--source', fx.source, '--target', 'user', '--method', 'copy'], { env });
+    assert(r.code === 0, `expected exit 0, got ${r.code}`);
+    assert(/would-overwrite/.test(r.stdout), `expected would-overwrite, got: ${r.stdout}`);
+    assert(/--adopt/.test(r.stdout), `expected --adopt hint, got: ${r.stdout}`);
+  } finally { fx.cleanup(); }
+});
+
+test('--adopt + --force in auto-mode replaces unmanaged install', () => {
+  const fx = makeFixture();
+  try {
+    const home = path.join(fx.root, 'fakehome');
+    fs.mkdirSync(home);
+    const env = process.platform === 'win32'
+      ? { USERPROFILE: home, HOMEDRIVE: '', HOMEPATH: '' }
+      : { HOME: home };
+    const unmanaged = path.join(home, '.claude', 'skills', 'mikko-foo');
+    fs.mkdirSync(unmanaged, { recursive: true });
+    fs.writeFileSync(path.join(unmanaged, 'SKILL.md'), '---\nname: mikko-foo\n---\n# old version\n');
+    const r = run(
+      ['--source', fx.source, '--target', 'user', '--method', 'copy', '--adopt', '--force'],
+      { env },
+    );
+    assert(r.code === 0, `expected exit 0, got ${r.code} (stderr: ${r.stderr})`);
+    assert(/adopted/.test(r.stdout), `expected "adopted" in stdout, got: ${r.stdout}`);
+    // Marker should now exist after adoption.
+    assert(fs.existsSync(path.join(unmanaged, '.mikko-install-source')),
+      'marker file missing after --adopt');
+    // Content should be from source (no longer "# old version").
+    const txt = fs.readFileSync(path.join(unmanaged, 'SKILL.md'), 'utf8');
+    assert(!/old version/.test(txt), 'unmanaged install was not actually replaced');
+  } finally { fx.cleanup(); }
+});
+
+test('--adopt without --force in auto-mode → exit 4', () => {
+  const fx = makeFixture();
+  try {
+    const home = path.join(fx.root, 'fakehome');
+    fs.mkdirSync(home);
+    const env = process.platform === 'win32'
+      ? { USERPROFILE: home, HOMEDRIVE: '', HOMEPATH: '' }
+      : { HOME: home };
+    const unmanaged = path.join(home, '.claude', 'skills', 'mikko-foo');
+    fs.mkdirSync(unmanaged, { recursive: true });
+    fs.writeFileSync(path.join(unmanaged, 'SKILL.md'), '---\nname: mikko-foo\n---\n# old\n');
+    const r = run(
+      ['--source', fx.source, '--target', 'user', '--method', 'copy', '--adopt'],
+      { env },
+    );
+    assert(r.code === 4, `expected exit 4, got ${r.code} (stderr: ${r.stderr})`);
+    assert(/auto-mode bypass refused/.test(r.stderr), `expected refusal msg, got: ${r.stderr}`);
+    // Unmanaged content should be preserved.
+    const txt = fs.readFileSync(path.join(unmanaged, 'SKILL.md'), 'utf8');
+    assert(/# old/.test(txt), 'unmanaged install was modified despite refusal');
+  } finally { fx.cleanup(); }
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

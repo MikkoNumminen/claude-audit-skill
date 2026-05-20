@@ -93,12 +93,12 @@ reply 'yes' to proceed, anything else aborts.
 
 Once confirmed, the suite runs through without further prompts. Individual audits may still have their own gates — see the next section for how the orchestrator handles them.
 
-### 3a. Handling phase-gated audits
+### Handling phase-gated audits (behavior during step 4)
 
 `security-audit` (and any future skill with its own phase gates) pauses for human approval between phases. **The suite does NOT block indefinitely waiting** — that would be a UX trap (the orchestrator could be blocked for hours / days). Instead:
 
 - When a dispatched audit hits a gate it can't auto-clear, the orchestrator marks that audit's row in the index as `⏸ gated`, writes the **partial** index immediately (covering all already-completed audits), and exits with a one-line note: `security-audit is at its phase gate; partial index written. Resume security-audit independently when you're ready.`
-- The human then either runs `/mikko-security-audit` directly to finish the phased run, or re-invokes `/mikko-audit-suite` later (which will skip the already-completed audits via the absence of stale `docs/audits/<name>-{today}.md` files if today's reports already exist).
+- The human then either runs `/mikko-security-audit` directly to finish the phased run, or re-invokes `/mikko-audit-suite` later — audits whose today-dated report already exists are marked `🔁 reused` and skipped (see step 4's "Idempotent re-runs" paragraph for the lookup logic).
 - The index can be updated by hand after the gated audit finishes, or it stays partial — both are acceptable. The suite does not auto-watch for completion.
 
 ### 4. Run the audits, in order
@@ -113,6 +113,8 @@ If an audit fails (pre-flight bail, malformed config, crash), log the failure in
 
 **Flag pass-through.** The `--source <path>` flag (when present on the suite invocation) is forwarded to each dispatched audit **only if that audit documents support for it**. Today, `react-anti-patterns-audit` is the only audit that explicitly accepts `--source`; the universal audits (`audit`, `ai-codegen-smell-audit`, `security-audit`) don't and would either error or silently ignore the flag. The orchestrator skips the pass-through for audits without documented support. This is a known limitation; standardising `--source` across every audit skill is tracked as portability work for the next audit-skill iteration.
 
+**Idempotent re-runs.** Before invoking each audit, check whether `docs/audits/<canonical-name>-{today}.md` already exists (from a prior partial run today — e.g. after a phase-gate pause, a Ctrl-C, or a transient failure). If so, **don't re-invoke**; mark that audit's row in the index as `🔁 reused`, link to the existing report, and move on to the next audit. This makes the suite safely re-runnable: a human can resume after security-audit's phase gate without paying to re-run the audits that already wrote today's report. The lookup is by report filename, not contents — if the human wants a fresh re-run, delete the existing dated report first (or just wait until tomorrow's `{date}`).
+
 ### 5. Write the index
 
 After all audits complete, fail, or hit an unblockable gate, write `docs/audits/audit-suite-YYYY-MM-DD.md` linking to each individual report. **The index is always written, even when every audit failed or got skipped** — the partial index is still useful evidence of what was attempted and which audit's failure mode to investigate next.
@@ -124,6 +126,17 @@ After all audits complete, fail, or hit an unblockable gate, write `docs/audits/
 - A `Total: N findings` / `N findings` line near the top.
 
 If none of these are parseable, mark the row's count as `—` (em-dash) and let the linked report itself be the source of truth. The orchestrator never invents a number it can't anchor in the report.
+
+**Status icons in the index** (the "Status" column vocabulary):
+
+| Icon | Status | Meaning |
+| --- | --- | --- |
+| `✅ ok` | completed | audit finished cleanly; report written; findings count parseable |
+| `⏸ gated` | paused | audit started but is waiting on a human approval (e.g. security-audit phase gate); resume independently |
+| `❌ failed` | failed | audit crashed mid-run or hit a fatal pre-flight bail; see linked report (if any) for the failure reason |
+| `🚫 cancelled` | cancelled | human cancelled mid-run (Ctrl-C / session abort); audits already in-flight may have completed before the cancel signal landed |
+| `🔁 reused` | reused | today-dated report already existed; not re-invoked; report link points at the prior run |
+| `❓ not installed` | skipped | `--partial` was passed and this audit's `~/.claude/skills/mikko-<name>/SKILL.md` is missing; nothing was run |
 
 Index format:
 

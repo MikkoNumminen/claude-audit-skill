@@ -1,6 +1,7 @@
 ---
 name: mikko-help
-description: List every installed `mikko-*` skill with its one-line description. The fast answer to "I know I have a skill for this but can't remember which one." Reads `~/.claude/skills/mikko-*/SKILL.md` frontmatter (plus any project-local `.claude/skills/mikko-*/SKILL.md`), extracts name + description, prints a single formatted table. Pass `--detect` to also scan the current working directory and recommend which `mikko-*` audit skills are likely to find signal — answers "I'm in a new codebase, which of my skills are relevant here?" No sub-agents, no network, no measurements — just a table (or a table with recommendations).
+description: List every installed `mikko-*` skill with its description (or with its `barney:` field when `--barney` is passed). The fast answer to "I know I have a skill for this but can't remember which one" / "what mikko skills do I have" / "list my skills" / "remind me what's installed." Pass `--detect` for codebase-aware audit recommendations ("which audit should I run on this repo" / "what's relevant for this codebase"). Pass `--barney` for plain-English short descriptions ("give me the friendly version" / "plain-English list"). `--detect` and `--barney` combine independently. No sub-agents, no network, no measurements — just a table. Full mode docs live in the body's "Flags" section.
+barney: Lists your mikko-* skills with their descriptions. Add --detect to also recommend which audits to run on THIS repo. Add --barney to swap descriptions for plain-English one-liners.
 ---
 
 # mikko-help
@@ -13,16 +14,21 @@ The discoverability sidekick for the `mikko-*` skill namespace. Type `/mikko-hel
 
 - "/mikko-help", "what mikko skills do I have", "list my skills", "remind me what's installed"
 - "/mikko-help --detect", "which audit should I run on this repo", "what's relevant for this codebase"
+- "/mikko-help --barney", "give me the friendly version", "plain-English list", "I don't need the full pitch"
 - Onboarding a new machine after a `claude-skills` `./install.sh` run — quick verification that everything landed
 - Before invoking another `mikko-*` skill, to confirm the exact name and what it expects
 - When you've just `cd`'d into an unfamiliar codebase and want a friendly "here's what your toolkit would do here" pointer
+- When walking a colleague (or a recruiter) through what your skill catalog does — `--barney` reads like a tour, the full `description` reads like a contract
 
 NOT for: cross-repo registry of skills (use `/mikko-skill-registry` for that — it walks sibling repos, this only reads the local skills directory), token-usage measurements (`/mikko-skill-usage` does that), or a full description of any one skill (use `man <name>` patterns or read its SKILL.md directly).
 
 ## Flags
 
-- (no flag) — list every installed `mikko-*` skill with its description. Default behavior; cheapest.
+- (no flag) — list every installed `mikko-*` skill with its `description` field. Default behavior; cheapest.
 - `--detect` — also scan the current working directory's codebase shape (language, framework, security surface) and emit an ordered "which audit should I run here" recommendation alongside the listing. Adds ~10K tokens to the run.
+- `--barney` — show each skill's optional `barney:` frontmatter field instead of the full `description`. Plain-English one-liners aimed at "what does this do" rather than "when does this fire / what's the full invocation surface." Falls back to `description` (truncated) for any skill without a `barney:` field. Cheap; same cost as default mode.
+
+`--detect` and `--barney` are independent and can combine: `/mikko-help --detect --barney` recommends audits AND uses the barney-style copy in the suggestion table.
 
 ## What this skill does
 
@@ -30,16 +36,20 @@ NOT for: cross-repo registry of skills (use `/mikko-skill-registry` for that —
 
 1. Glob `~/.claude/skills/mikko-*/SKILL.md` (user-wide skills).
 2. Glob `.claude/skills/mikko-*/SKILL.md` relative to the current working directory (project-local skills).
-3. For each path, read the first ~10 lines and extract the YAML frontmatter `name` and `description` fields.
+3. For each path, read the first ~15 lines and extract the YAML frontmatter `name`, `description`, and `barney` (optional) fields.
 4. Deduplicate by `name` (a skill installed both user-wide AND project-local appears once; the project-local copy wins, matching Claude Code's own resolution order).
 5. Sort alphabetically.
 6. Print a two-column table: name (green) + description-first-sentence (dim). Truncate descriptions longer than ~120 characters with an em-dash continuation.
+
+**`--barney` mode (substitutes step 6's source):**
+
+6b. Use each skill's `barney` field as the description column, falling back to the truncated `description` field when `barney` is absent. Everything else (glob, dedupe, sort, formatting) is identical.
 
 **`--detect` mode (everything above, plus):**
 
 7. Run the codebase-shape detection (see "`--detect` mode" section below).
 8. Map detected signals to a recommendation list using the decision matrix.
-9. Print the recommendation list AFTER the regular skill table, with one-line rationale per audit (why it's relevant here, or why it's being skipped).
+9. Print the recommendation list AFTER the regular skill table, with one-line rationale per audit (why it's relevant here, or why it's being skipped). When `--barney` is ALSO passed, the regular skill table at the top uses barney-style copy (same as bare `--barney`). **The recommendation rationales below stay codebase-specific** — they depend on `--detect` signals (e.g. "targets the React-specific layer, 12 .tsx files"), not on the skill's static description. `--barney` is presentation for the listing, not content for the recommendation reasoning.
 
 End-to-end in one main-thread turn. No tools beyond `Glob` and `Read`. Output goes to the chat — nothing is written to disk.
 
@@ -61,6 +71,24 @@ tip: `/mikko<Tab>` shows names only. For the cross-repo registry with token math
 Truncate descriptions at the first em-dash / period if shorter; otherwise hard-cap at 120 characters and append `…`. The goal is one-screen scannability, not full prose.
 
 If both user-wide and project-local copies of the same skill exist, append `(project)` after the project-local one's name so the distinction is visible.
+
+### `--barney` mode output
+
+```
+your installed mikko-* skills (barney style):
+
+  mikko-audit                      Looks for bugs in your code — leaks, races, swallowed errors, missing timeouts…
+  mikko-ai-codegen-smell-audit     Scans for ten patterns that show up most often in AI-generated code…
+  mikko-help                       Lists your mikko-* skills with their descriptions. Add --detect to also…
+  mikko-react-anti-patterns-audit  Checks your React code for six common gotchas (index-as-key, useEffect-for…
+  mikko-security-audit             Walks your attack surface (auth, input, secrets, deps, etc.), finds security…
+  mikko-skill-usage                Counts how often you've actually used each Claude Code skill by reading…
+  mikko-audit-suite                Runs every audit that fits this codebase, then writes one summary doc…
+
+tip: drop --barney for the full description, or add --detect to also see audit recommendations for THIS repo.
+```
+
+A skill without a `barney:` field shows the truncated `description` with an `(no barney)` annotation so the gap is visible — encourages adding the field when authoring new skills, doesn't break the listing for skills that don't have it.
 
 ### `--detect` mode output
 
@@ -155,7 +183,7 @@ Both globs are cheap. The user-wide path is platform-dependent — use `os.homed
 
 ### 2. Read frontmatter
 
-For each matched `SKILL.md`, `Read` the first 10 lines. Parse the YAML frontmatter between the `---` delimiters. Extract `name` and `description`.
+For each matched `SKILL.md`, `Read` the first 15 lines (was 10 — bumped to comfortably cover `name`, `description`, and an optional `barney` line). Parse the YAML frontmatter between the `---` delimiters. Extract `name`, `description`, and `barney` (optional). When `--barney` is passed and the field is missing, fall back to the truncated `description` with a `(no barney)` annotation so authors are nudged to add the field at next edit.
 
 If the frontmatter is malformed or the file has none, fall back to the parent directory name as the `name` and `(no description)` as the description — log the skip in a `notes` section at the bottom of the output.
 
@@ -193,6 +221,7 @@ Cadence: ad-hoc, usually a few times per week when actively iterating. ~50 uses/
 - **YAML frontmatter parse failure.** Don't fail the whole run — fall back to dirname + "(no description)" and add a one-line note.
 - **Symlinked skills.** When a skill is installed via `claude-skills/install.sh`, the directory is a symlink. `Glob` and `Read` follow symlinks transparently; nothing special needed.
 - **Non-mikko-* skills in the same directory.** The glob filter excludes them. If the user wants to see Anthropic-shipped skills too, that's `/help` territory, not this skill.
+- **`--barney` on a skill without the field.** Falls back to the truncated `description` with an `(no barney)` annotation. The annotation is the design: it makes the gap visible without breaking the listing, nudging the human (or the next SKILL.md author) to add the field at next edit. Don't infer or invent a barney line — that defeats the point of having an explicit field.
 - **`--detect` in a directory with no config files.** A plain `/tmp/scratch/` with one `.py` file and nothing else returns the "Unknown / mixed / no clear signal" row from the matrix. The recommendation is `audit` only. This is correct behavior, not a bug — the detector is honest about what it can and can't infer.
 - **`--detect` in a polyglot monorepo.** A repo with both a Python backend AND a React frontend gets recommendations for both stacks. The output prints two grouped sections rather than collapsing into a single "polyglot" verdict — concrete is more useful than abstract here.
 

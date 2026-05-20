@@ -1,6 +1,7 @@
 ---
 name: security-audit
 description: Orchestrates the multi-phase security audit + remediation. Phase 0 sets up agents; Phase 1 maps the full attack surface (entry points, auth, authz, input, secrets, data exposure, deps, transport, client, ops); Phase 2 turns findings into a prioritized remediation plan; Phase 3 fixes one finding at a time with regression tests (crit/high sequential, low/med parallelizable in worktrees); Phase 4 writes AI-first security documentation (SECURITY.md, threat model, invariants, code-level markers, lint rules); Phase 5 verifies. Each phase produces an artifact under docs/security/ and STOPS at a gate for user approval. Never auto-advances. Critical findings surface immediately.
+barney: Walks your attack surface (auth, input, secrets, deps, etc.), finds security holes, then helps fix them one at a time with regression tests. Pauses for your approval between phases — never autopilots.
 ---
 
 # When to use

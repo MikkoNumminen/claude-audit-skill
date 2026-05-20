@@ -77,6 +77,20 @@ Three audiences:
 
 The trade-off vs vendoring (copy-into-each-repo) is that consumer repos depend on this one being checked out somewhere. That's acceptable for a personal toolbox; less so if you're shipping skills as a published artifact. If you want copies instead of symlinks, replace `ln -s` with `cp -R` in `install.sh` — the rest of the structure stays the same.
 
+## Frontmatter convention: `name`, `description`, `barney`
+
+Each SKILL.md's YAML frontmatter carries three fields:
+
+- **`name`** — the slash-command identifier (e.g. `audit`, `react-anti-patterns-audit`). This is what Claude Code's harness matches against; `install-mikko.sh` rewrites it to the prefixed name in the consumer-side copy (`mikko-audit`, etc.).
+- **`description`** — the contract: when to invoke, what gets read/written, trigger phrases, scope boundaries. Optimised for Claude Code's skill-matching layer, which compares natural-language requests against this field. Long, precise, full of "when X / not when Y" disambiguation. Reads like a contract.
+- **`barney`** — *(optional)* a plain-English one-or-two-line description of what the skill does in everyday terms. Reads like a tour. Used by `/mikko-help --barney` for friendly listings. Skills without `barney` fall back to the truncated `description` in barney mode; the gap is surfaced with a `(no barney)` annotation, nudging authors to add the field.
+
+Both `description` and `barney` are author-written and editorial — the `description` is optimised for accurate slash-command matching, the `barney` is optimised for human scannability. Keep them aligned but not identical: when the precise contract reads stiffly, the barney line is where you say it like a person would.
+
+**Length guideline for `barney`:** target around 140 characters so the table layout in `/mikko-help --barney` stays clean on a typical terminal width. Longer lines are fine in the SKILL.md itself; `mikko-help` truncates with an ellipsis when rendering the table. For comparison, the longest barney line in this library today is ~190 chars (security-audit) — readable in full when wrapped, but cropped in the listing.
+
+**Authoring guideline — when to write a `barney`:** Add one if the `description` is longer than ~3 sentences or reads as a contract rather than a tour. Short, friendly descriptions don't need a separate human-friendly version — a single field carrying both jobs is fine when it can manage that. Most skills with long descriptions (audits, orchestrators, anything contract-heavy like `mikko-help` itself) benefit from both fields.
+
 ## What's verifiable vs editorial
 
 The audit skill produces real outputs (markdown reports, GitHub PRs) against real codebases. Its claims (severity counts, missed-pattern lists) are auditable from the resulting report. The `skill-usage` skill measures actual transcript data from Claude Code's local JSONL files — no synthetic estimates, no extrapolation.

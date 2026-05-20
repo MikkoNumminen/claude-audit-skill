@@ -26,7 +26,7 @@ The deterministic work lives in **`install.mjs`** in this skill directory. SKILL
 
 ## Flags
 
-- `--source PATH` — path to the source repo. If omitted, probe cwd for `.claude/skills/mikko-*/SKILL.md` siblings; otherwise prompt and bail.
+- `--source PATH` — path to the source repo. If omitted, probe cwd for `.claude/skills/mikko-*/SKILL.md` siblings; if nothing found, bail with exit 3 and ask the user to pass `--source` explicitly. (No interactive prompt — the script is designed to work headless.)
 - `--target user|project` — `user` → `~/.claude/skills/` (default). `project` → `<cwd>/.claude/skills/`.
 - `--only NAME` — restrict to the named skill. Repeatable. Default: all `mikko-*` skills in source.
 - `--method copy|symlink` — `copy` duplicates (default on Windows, safer without admin). `symlink` (default on macOS/Linux) picks up `git pull` updates automatically. On symlink failure (Windows without Developer Mode) the script falls back to copy and writes a one-line stderr note.
@@ -37,7 +37,7 @@ The deterministic work lives in **`install.mjs`** in this skill directory. SKILL
 
 ## Procedure
 
-1. **Resolve source.** Use `--source` if set; else probe cwd for `.claude/skills/mikko-*/SKILL.md` siblings; else prompt once and bail (exit 3) if no answer.
+1. **Resolve source.** Use `--source` if set; else probe cwd for `.claude/skills/mikko-*/SKILL.md` siblings; else bail with exit 3 (the user re-runs with an explicit `--source PATH`).
 2. **Resolve target.** `~/.claude/skills/` (default) or `<cwd>/.claude/skills/` per `--target`. Created on demand.
 3. **Listing (`--list`).** Walk the target directory; for each `mikko-*` entry, read its `.mikko-install-source` marker file (written by previous installs) to report where it came from. Symlinks are reported as `symlink`; bare copies without a marker show `(no .mikko-install-source marker — manual install?)`. No source resolution required.
 4. **Enumerate source skills.** `install.mjs` lists `<source>/.claude/skills/mikko-*/` directories that contain a `SKILL.md`.
@@ -62,6 +62,7 @@ The deterministic work lives in **`install.mjs`** in this skill directory. SKILL
 - Does not edit installed skill content.
 - Does not touch skills outside the `mikko-*` prefix.
 - Does not delete `docs/audits/` or other user artifacts. Uninstall removes the skill directory only.
+- Does not validate `SKILL.md` content beyond directory hashing — trust your sources. A malicious source repo could ship a `SKILL.md` with prompt-injection content, which the harness would honor at use time. Only install from sources you trust.
 
 ## Failure modes and exit codes
 

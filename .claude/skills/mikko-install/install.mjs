@@ -88,21 +88,13 @@ function probeSource(explicit) {
   // Probe cwd: does it have mikko-* sibling skills?
   const cwdSkillsDir = path.join(process.cwd(), '.claude', 'skills');
   if (fs.existsSync(cwdSkillsDir)) {
-    const entries = safeReaddir(cwdSkillsDir);
+    const entries = fs.readdirSync(cwdSkillsDir);
     if (entries.some((n) => n.startsWith('mikko-') && fs.existsSync(path.join(cwdSkillsDir, n, 'SKILL.md')))) {
       return process.cwd();
     }
   }
   console.error('error: no --source given and could not auto-detect (cwd has no .claude/skills/mikko-*/SKILL.md siblings)');
   process.exit(3);
-}
-
-function safeReaddir(p) {
-  try {
-    return fs.readdirSync(p);
-  } catch {
-    return [];
-  }
 }
 
 function listSourceSkills(sourceDir) {
@@ -187,19 +179,38 @@ function copyDir(src, dst) {
 
 function tryInstall(srcDir, dstDir, method) {
   // Returns the method actually used ('copy' or 'symlink').
-  rmrf(dstDir);
+  // Atomic-ish: stage the new install in a sibling tempdir, then swap.
+  // If the copy fails partway, the original install is still intact.
+  const parent = path.dirname(dstDir);
+  fs.mkdirSync(parent, { recursive: true });
+
   if (method === 'symlink') {
+    // Symlinks land at the final path directly (atomic on POSIX; on Windows
+    // requires Developer Mode). On failure we fall through to copy.
     try {
-      const parent = path.dirname(dstDir);
-      fs.mkdirSync(parent, { recursive: true });
+      // Remove any existing entry before symlinking — symlinkSync won't replace.
+      rmrf(dstDir);
       fs.symlinkSync(srcDir, dstDir, 'dir');
       return 'symlink';
     } catch (err) {
       console.error(`note: symlink failed (${err.code ?? err.message}) — falling back to copy`);
-      // fall through
+      // fall through to copy below
     }
   }
-  copyDir(srcDir, dstDir);
+
+  // Copy path: write to a tempdir alongside the target, then atomically rename.
+  const stageDir = path.join(parent, `.${path.basename(dstDir)}.tmp-${process.pid}-${Date.now()}`);
+  rmrf(stageDir);
+  try {
+    copyDir(srcDir, stageDir);
+    rmrf(dstDir);
+    fs.renameSync(stageDir, dstDir);
+  } catch (err) {
+    // Best-effort cleanup of the staging dir; the original dstDir is untouched
+    // because we haven't called rmrf on it yet if the copy itself failed.
+    rmrf(stageDir);
+    throw err;
+  }
   return 'copy';
 }
 
@@ -243,12 +254,24 @@ async function runList(targetDir) {
   const maxLen = Math.max(...entries.map((n) => n.length));
   for (const name of entries) {
     const skillDir = path.join(targetDir, name);
-    const marker = readMarker(skillDir);
     let kind = 'copy';
+    let source;
     try {
-      if (fs.lstatSync(skillDir).isSymbolicLink()) kind = 'symlink';
+      if (fs.lstatSync(skillDir).isSymbolicLink()) {
+        kind = 'symlink';
+        // Symlinks don't carry a marker file (the marker would land inside the
+        // source repo). The link target itself IS the source pointer.
+        try {
+          source = fs.readlinkSync(skillDir);
+        } catch {
+          source = '(broken symlink)';
+        }
+      }
     } catch { /* ignore */ }
-    const source = marker ?? '(no .mikko-install-source marker — manual install?)';
+    if (kind === 'copy') {
+      const marker = readMarker(skillDir);
+      source = marker ?? '(no .mikko-install-source marker — manual install?)';
+    }
     console.log(`  ${pad(name, maxLen + 2)} ${pad(kind, 8)} ${source}`);
   }
   console.log(`\n${entries.length} skill(s) installed.`);
@@ -276,15 +299,17 @@ async function runUninstall(args, sourceDir, targetDir, sourceSkills) {
     }
     // Compare against source if available.
     let drift = false;
+    let reason = 'drift vs. source';
     if (sourceSkills.includes(name)) {
       const srcHash = hashDir(path.join(sourceDir, '.claude', 'skills', name));
       const dstHash = hashDir(dst);
       drift = srcHash !== dstHash;
     } else {
-      drift = true; // no source to verify against → treat as drift
+      drift = true;
+      reason = 'no source to verify against';
     }
     if (drift && !args.force) {
-      console.log(`  ${pad(name, 32)} refused (drift vs. source — re-run with --force)`);
+      console.log(`  ${pad(name, 32)} refused (${reason} — re-run with --force)`);
       kept++;
       continue;
     }
@@ -294,7 +319,7 @@ async function runUninstall(args, sourceDir, targetDir, sourceSkills) {
         console.error('auto-mode bypass refused — re-run in an interactive shell');
         process.exit(4);
       }
-      const ok = await promptYesNo(`  ${name} differs from source. Really remove?`);
+      const ok = await promptYesNo(`  ${name} (${reason}). Really remove?`);
       if (!ok) {
         console.log(`  ${pad(name, 32)} kept (user declined)`);
         kept++;
@@ -395,8 +420,10 @@ async function runInstall(args, sourceDir, targetDir, sourceSkills) {
   console.log(
     `\n${skills.length} skills processed: ${installed} installed, ${updated} updated, ${upToDate} up-to-date, ${skipped} skipped.`,
   );
-  if (installed + updated > 0) {
-    console.log('\nnext: run /mikko-skills to see what is now available.');
+  // Print the next-step hint to stderr so the LLM driving the skill doesn't
+  // mistake it for a command to auto-run. Skip on dry-run since nothing changed.
+  if (!args.dryRun && installed + updated > 0) {
+    console.error('\nnext: run /mikko-skills to see what is now available.');
   }
   return 0;
 }
